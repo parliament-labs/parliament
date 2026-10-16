@@ -1,0 +1,14 @@
+film_id|integer|NO|nextval('film_film_id_seq'::regclass)||
+title|text|NO|||
+description|text|YES|||
+release_year|year|YES|||
+language_id|integer|NO|||
+original_language_id|integer|YES|||
+rental_duration|smallint|NO|3||
+rental_rate|numeric(4,2)|NO|4.99||
+length|smallint|YES|||
+replacement_cost|numeric(5,2)|NO|19.99||
+rating|mpaa_rating|YES|'G'::mpaa_rating||
+last_update|timestamp with time zone|NO|now()||
+special_features|text[]|YES|||
+fulltext|tsvector|NO|||

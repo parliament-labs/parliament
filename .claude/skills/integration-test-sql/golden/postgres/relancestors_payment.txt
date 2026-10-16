@@ -1,0 +1,10 @@
+1|public|customer|customer_id|customer_id||
+1|public|rental|rental_id|rental_id||
+1|public|staff|staff_id|staff_id||
+2|public|address|address_id|address_id|public|customer
+2|public|address|address_id|address_id|public|staff
+2|public|customer|customer_id|customer_id|public|rental
+2|public|inventory|inventory_id|inventory_id|public|rental
+2|public|staff|staff_id|staff_id|public|rental
+2|public|store|store_id|store_id|public|customer
+2|public|store|store_id|store_id|public|staff

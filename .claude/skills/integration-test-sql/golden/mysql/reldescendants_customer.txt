@@ -1,0 +1,4 @@
+Depth	Ref_schema	Ref_table	From_columns	To_columns	Via_schema	Via_table
+1	sakila	payment	customer_id	customer_id		
+1	sakila	rental	customer_id	customer_id		
+2	sakila	payment	rental_id	rental_id	sakila	rental

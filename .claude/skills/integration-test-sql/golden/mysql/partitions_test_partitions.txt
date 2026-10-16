@@ -1,0 +1,4 @@
+Partition_schema	Partition_name	Partition_bound	Partition_rows	Partition_data_length
+sakila	p2022	VALUES LESS THAN (2023)	3	16384
+sakila	p2023	VALUES LESS THAN (2024)	3	16384
+sakila	p2024	VALUES LESS THAN (2025)	3	16384

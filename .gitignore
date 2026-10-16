@@ -1,0 +1,46 @@
+# Rust build artifacts
+/target/
+
+# Trunk WASM build output
+/dist/
+
+# macOS
+.DS_Store
+
+# Editor swap files
+*.swp
+*.swo
+
+# Environment / secrets (precaution)
+.env
+secrets.env
+
+# Local README preview artifact (grip/python-markdown output)
+.readme-preview.html
+
+# Playwright output (if ever run from a working dir that lands it here)
+test-results/
+playwright-report/
+
+# Bundled shareable artifacts (Flashy-README zip, etc.)
+/artifacts/
+
+# Obsidian personal UI state for vault/ — workspace.json churns on every
+# note switch; nothing in .obsidian/ is worth sharing for a solo vault.
+vault/.obsidian/
+
+# Claude's working notes for this project (and the pre-compact snapshot
+# .claude/hooks/pre-compact.sh writes there): local, not published.
+/memory/
+
+# Testing a vendored crate on its own (cargo test --manifest-path …)
+# gives it a lockfile and target dir of its own.
+/vendor/*/Cargo.lock
+/vendor/*/target/
+
+# Build output of crates outside the workspace root (`/dist/` covers only
+# the root's).
+/strix/dist/
+
+# Scratch screenshots the ad-hoc capture specs write next to themselves.
+/tests/playwright/screenshots/_*/

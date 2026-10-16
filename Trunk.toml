@@ -1,0 +1,4 @@
+[build]
+target = "tyto/index.html"
+dist = "dist"
+

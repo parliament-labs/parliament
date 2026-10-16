@@ -1,0 +1,4 @@
+1|public|address|address_id|address_id||
+1|public|store|store_id|store_id||
+2|public|address|address_id|address_id|public|store
+2|public|city|city_id|city_id|public|address

@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "pagila": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres@127.0.0.1:5432/pagila"
+      ]
+    },
+    "sakila": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-server-mysql"
+      ],
+      "env": {
+        "MYSQL_HOST": "127.0.0.1",
+        "MYSQL_PORT": "3306",
+        "MYSQL_USER": "root",
+        "MYSQL_PASS": "",
+        "MYSQL_DB": "sakila"
+      }
+    }
+  }
+}

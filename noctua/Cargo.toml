@@ -1,0 +1,37 @@
+[package]
+name = "noctua"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+
+[[bin]]
+name = "noctua"
+path = "src/main.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "mysql", "postgres", "chrono", "bigdecimal", "ipnetwork", "uuid"] }
+ipnetwork = "0.20"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+tower-http = { version = "0.5", features = ["fs", "cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = "0.4"
+futures-util = "0.3"
+# External editor integration. tempfile gives us mkstemp(3)-backed
+# `NamedTempFile` (atomic create, 0600 mode, RAII auto-delete on
+# drop) — covers symlink attacks, other-local-user reads, and stale
+# files from editor crashes. shlex parses the editor command string
+# (e.g. `"code -w"`, `"\"C:\\Program Files\\Sublime\\subl.exe\" -w"`)
+# into argv tokens so quoted paths-with-spaces work.
+tempfile = "3"
+shlex = "1"
+
+[target.'cfg(unix)'.dependencies]
+# setsid() for directly-launched editors, so one that wants a terminal
+# can't take over noctua's.
+libc = "0.2"

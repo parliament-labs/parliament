@@ -1,0 +1,8 @@
+Schema_	Table_	Field	Ord	Is_pk
+sakila	city	city_id	1	1
+sakila	city	city	2	0
+sakila	city	country_id	3	0
+sakila	city	last_update	4	0
+sakila	country	country_id	1	1
+sakila	country	country	2	0
+sakila	country	last_update	3	0

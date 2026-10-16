@@ -1,0 +1,2 @@
+CREATE TABLE public.payment_p2022_01 PARTITION OF public.payment
+    FOR VALUES FROM ('2021-12-31 16:00:00-08') TO ('2022-01-31 16:00:00-08');

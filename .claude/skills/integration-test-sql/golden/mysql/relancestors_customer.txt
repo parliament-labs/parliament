@@ -1,0 +1,6 @@
+Depth	Ref_schema	Ref_table	From_columns	To_columns	Via_schema	Via_table
+1	sakila	address	address_id	address_id		
+1	sakila	store	store_id	store_id		
+2	sakila	address	address_id	address_id	sakila	store
+2	sakila	city	city_id	city_id	sakila	address
+2	sakila	staff	manager_staff_id	staff_id	sakila	store

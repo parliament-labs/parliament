@@ -1,0 +1,17 @@
+[workspace]
+members = ["shared", "noctua", "tyto"]
+default-members = ["noctua"]
+exclude = ["vendor"]
+resolver = "2"
+
+# sqlx-postgres 0.8.6 with Parliament's patch: every statement's result
+# keeps the server's command tag and row description, and the session's
+# transaction status is exposed — psql shows all three; sqlx discards or
+# hides them. See vendor/sqlx-postgres/PARLIAMENT.md.
+[patch.crates-io]
+sqlx-postgres = { path = "vendor/sqlx-postgres" }
+# sqlx-mysql 0.8.6 with Parliament's patch: the handshake asks for what
+# the mysql CLI asks for (rows changed, not matched; no IGNORE_SPACE), and
+# each result keeps its warnings and info line and the session's
+# transaction status. See vendor/sqlx-mysql/PARLIAMENT.md.
+sqlx-mysql = { path = "vendor/sqlx-mysql" }

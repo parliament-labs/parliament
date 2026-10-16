@@ -1,0 +1,4737 @@
+/* ── Reset & base ──────────────────────────────────────────────────────────── */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    /* ── Sidebar (light) ── */
+    --sidebar-bg:        #f0f2f5;
+    --sidebar-border:    #d0d7de;
+    --sidebar-hover:     #dde1e7;
+    --sidebar-active-bg: #0969da;
+    /* Folder section headers (Recents, Active Connections, All Connections,
+       Postgres, MySQL group headers). Light-green tint so headers read
+       as clickable + structural without competing with the vibrant
+       selected-connection blue. */
+    --sidebar-folder-bg:       #dcfce7;
+    --sidebar-folder-bg-hover: #bbf7d0;
+    --sidebar-text:      #1f2328;
+    --sidebar-text-muted:#57606a;
+    --sidebar-text-dim:  #8c959f;
+
+    /* ── App header (light, same as sidebar) ── */
+    --header-bg:         #f0f2f5;
+    --header-border:     #d0d7de;
+
+    /* ── Workspace (dark) ── */
+    --main-bg:    #0d1117;
+    --panel-bg:   #161b22;
+    --border:     #21262d;
+
+    --text:       #e6edf3;
+    --text-muted: #8b949e;
+    --text-dim:   #484f58;
+
+    --accent:     #58a6ff;
+    --green:      #3fb950;
+    --red:        #f85149;
+    --yellow:     #d29922;
+    --purple:     #bc8cff;
+
+    --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+    --font-ui:   -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+html, body {
+    height: 100%;
+    background: var(--main-bg);
+    color: var(--text);
+    overflow: hidden;
+    /* Prevent trackpad/edge-swipe scrolls from chaining out to the
+       browser's back/forward navigation when an inner scroll
+       container hits its edge — Chrome on macOS reads a continued
+       leftward swipe at the left edge of an `overflow: auto` panel
+       as a "go back" gesture and would yank the user out of the
+       app. `none` also disables the rubber-band effect at viewport
+       edges, which we don't use anyway. */
+    overscroll-behavior: none;
+}
+
+/* ── App shell ─────────────────────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; height: 100vh; font-family: var(--font-ui); }
+
+/* ── Disconnected banner ───────────────────────────────────────────────────── */
+.ws-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    background: #8b1d1d;
+    color: #fff;
+    font-size: 12px;
+    font-family: var(--font-ui);
+    border-bottom: 1px solid #5d1212;
+    flex-shrink: 0;
+}
+.ws-banner-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #ff6b6b;
+    box-shadow: 0 0 6px #ff6b6b;
+    animation: ws-banner-pulse 1.5s ease-in-out infinite;
+    flex-shrink: 0;
+}
+.ws-banner-text { line-height: 1.4; flex: 1; }
+.ws-banner-btn {
+    margin-left: auto;
+    padding: 3px 12px;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    background: #fff;
+    color: #8b1d1d;
+    border: 1px solid #fff;
+    border-radius: 3px;
+    cursor: pointer;
+    font-weight: 600;
+}
+.ws-banner-btn:hover {
+    background: #f5d7d7;
+    border-color: #f5d7d7;
+}
+@keyframes ws-banner-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.4; }
+}
+
+/* ── App header (full-width title bar) ─────────────────────────────────────── */
+.app-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    height: 38px;
+    flex-shrink: 0;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
+    user-select: none;
+}
+.app-header-icon { color: var(--accent); font-size: 15px; }
+.app-header-title { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; color: var(--sidebar-text); }
+.app-header-spacer { flex: 1; }
+.app-header-sep { width: 1px; height: 18px; background: var(--sidebar-border); margin: 0 4px; flex-shrink: 0; }
+/* SVG icons inside header buttons */
+.hdr-icon { width: 15px; height: 15px; fill: currentColor; display: block; }
+.app-header-btn {
+    background: none;
+    border: none;
+    color: var(--sidebar-text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 14px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: color 0.15s, background 0.15s;
+}
+.app-header-btn:hover { color: var(--sidebar-text); background: var(--sidebar-hover); }
+
+/* ── App body ──────────────────────────────────────────────────────────────── */
+.app-body { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Workspace (tab bar + content) ────────────────────────────────────────── */
+.workspace { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-width: 0; }
+
+/* ── Tab bar ───────────────────────────────────────────────────────────────── */
+.tab-bar {
+    display: flex;
+    align-items: stretch;
+    height: 34px;
+    flex-shrink: 0;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+}
+.tab-list { display: flex; align-items: stretch; flex: 1; overflow: hidden; }
+.tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    font-size: 12px;
+    font-family: var(--font-ui);
+    color: var(--text-muted);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+    transition: background 0.1s;
+    min-width: 0;
+    max-width: 200px;
+}
+.tab:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.tab-active {
+    background: var(--main-bg);
+    color: var(--text);
+    border-top: 2px solid var(--accent);
+    padding-top: 2px; /* compensate for border-top */
+}
+.tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.tab-close {
+    font-size: 13px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: color 0.1s, background 0.1s;
+}
+.tab-close:hover { color: var(--text); background: var(--sidebar-hover); }
+.tab-bar-spacer { flex: 1; }
+.tab-actions {
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    gap: 2px;
+    border-left: 1px solid var(--border);
+}
+.tab-action-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 7px;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+}
+.tab-action-btn:hover { color: var(--text); background: var(--sidebar-hover); }
+.tab-action-btn-active { color: var(--accent) !important; }
+.tab-action-icon {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+.tab-action-icon:hover { opacity: 1; color: var(--text); }
+.tab-action-icon svg { display: block; }
+
+/* ── Tab content (hosts the active pane) ───────────────────────────────────── */
+.tab-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+
+/* A workspace's panes, tab bars and dividers, each absolutely placed in
+   it by pane_layout.rs. */
+.pane-area { position: relative; flex: 1; overflow: hidden; min-width: 0; min-height: 0; }
+
+/* ── Sidebar ───────────────────────────────────────────────────────────────── */
+.sidebar {
+    width: 220px;
+    min-width: 180px;
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+}
+
+.sidebar-section {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+
+.sidebar-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 16px 4px;
+}
+.sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--sidebar-text-muted);
+}
+.sidebar-add-btn {
+    background: none;
+    border: none;
+    color: var(--sidebar-text-muted);
+    cursor: pointer;
+    padding: 2px 4px;
+    font-size: 16px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+}
+.sidebar-add-btn:hover { color: var(--sidebar-text); background: var(--sidebar-hover); }
+
+/* Hover wrapper around the + button — reveals the New connection /
+   New folder dropdown when the cursor is anywhere in the wrapper. The
+   menu sits below the trigger; positioned absolute so the trigger's
+   bounding box stays the same size whether the menu is open or not. */
+.sidebar-add-trigger {
+    position: relative;
+    display: inline-block;
+}
+.sidebar-add-menu {
+    /* position: fixed so the menu escapes the .sidebar-section ancestor's
+       overflow-y: auto clip context. Inline `left`/`top` come from the
+       trigger's getBoundingClientRect captured at mouseenter time. */
+    position: fixed;
+    z-index: 1002;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    min-width: 240px;
+    padding: 4px 0;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text);
+    user-select: none;
+}
+.sidebar-add-menu-item {
+    padding: 6px 14px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.sidebar-add-menu-item:hover {
+    background: var(--accent);
+    color: #fff;
+}
+
+.conn-item {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 16px 7px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--sidebar-border);
+}
+.conn-item:hover { background: var(--sidebar-hover); }
+.conn-item.active { background: var(--sidebar-active-bg); }
+
+/* ── Top row: indicator · name · badges · pin ── */
+.conn-item-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Status dot (replaces old .conn-dot) */
+.conn-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--sidebar-text-dim);
+    flex-shrink: 0;
+    transition: background 0.2s, box-shadow 0.2s;
+}
+.conn-status-dot.conn-dot-connected { background: var(--green); box-shadow: 0 0 4px var(--green); }
+.conn-status-dot.conn-dot-busy {
+    background: #f59e0b;
+    box-shadow: 0 0 5px #f59e0b;
+    animation: pulse-dot 0.8s ease-in-out infinite alternate;
+}
+@keyframes pulse-dot {
+    from { opacity: 1; }
+    to   { opacity: 0.4; }
+}
+
+.conn-item.active .conn-status-dot.conn-dot-connected { box-shadow: 0 0 4px rgba(255,255,255,0.6); }
+.conn-item.active .conn-status-dot.conn-dot-busy      { box-shadow: 0 0 5px rgba(255,255,255,0.6); }
+
+.conn-name {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--sidebar-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+}
+.conn-item.active .conn-name { color: #fff; }
+
+/* ⛓ link indicator on sidebar rows whose connection appears in more
+   than one folder. Low-contrast so it reads as an annotation, not a
+   primary affordance — the user already sees the connection rendered
+   twice; the chain just labels why. */
+.conn-link-indicator {
+    font-size: 10px;
+    color: var(--sidebar-text-muted);
+    opacity: 0.6;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+.conn-item.active .conn-link-indicator {
+    color: #fff;
+    opacity: 0.7;
+}
+
+/* Pane count badge — shown when > 1 pane uses this connection */
+.conn-pane-count {
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--sidebar-border);
+    color: var(--sidebar-text-muted);
+    border-radius: 8px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+.conn-item.active .conn-pane-count { background: rgba(255,255,255,0.2); color: #fff; }
+
+/* Unread badge */
+.conn-unread-badge {
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--red);
+    color: #fff;
+    border-radius: 8px;
+    padding: 1px 5px;
+    flex-shrink: 0;
+}
+
+/* ── Meta row: host:port · db ── */
+.conn-item-meta {
+    font-size: 11px;
+    color: var(--sidebar-text-muted);
+    margin-top: 2px;
+    padding-left: 13px;   /* align under name (past the dot) */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.conn-item.active .conn-item-meta { color: rgba(255,255,255,0.7); }
+
+/* ── Status row ── */
+.conn-item-status {
+    font-size: 11px;
+    color: var(--sidebar-text-dim);
+    margin-top: 1px;
+    padding-left: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.conn-item-status.conn-status-busy { color: #f59e0b; }
+.conn-item-status.conn-status-err  { color: var(--red); }
+.conn-item.active .conn-item-status { color: rgba(255,255,255,0.6); }
+.conn-item.active .conn-item-status.conn-status-busy { color: #fcd34d; }
+.conn-item.active .conn-item-status.conn-status-err  { color: #fca5a5; }
+
+/* Pin button — hidden until hover, shown when pinned */
+.conn-pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 11px;
+    padding: 0 2px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.conn-item:hover .conn-pin-btn { opacity: 0.5; }
+.conn-item:hover .conn-pin-btn:hover { opacity: 1; }
+.conn-pin-btn.conn-pin-active { opacity: 1; }
+.conn-item.active .conn-pin-btn { opacity: 0.7; }
+.conn-item.active .conn-pin-btn:hover { opacity: 1; }
+
+/* ── Folder rows in the connections sidebar ───────────────────────────
+   No icon, no chevron — folder rows render as plain collapsible category
+   labels. Visible/hidden children are the only collapse indicator. */
+.folder-node {
+    display: flex;
+    align-items: center;
+    padding: 4px 12px 4px 6px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--sidebar-text-dim);
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.1s, color 0.1s;
+}
+.folder-node:hover {
+    background-color: var(--sidebar-hover);
+    color: var(--sidebar-text-muted);
+}
+.folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* Drag events fire on the deepest element under the pointer; without
+       this, crossing from .folder-node into .folder-name would trigger
+       dragleave on the parent and clear the drop-target highlight. */
+    pointer-events: none;
+}
+/* Root section headers (Recents / Active Connections / All Connections /
+   user folders) — anchor the tree visually + read as obviously clickable
+   via the sky-blue background. Distinct enough from the vibrant selected-
+   connection blue that the two don't compete. */
+.folder-node-root {
+    color: var(--sidebar-text-muted);
+    background-color: var(--sidebar-folder-bg);
+    padding-top: 6px;
+    padding-bottom: 4px;
+}
+.folder-node-root:hover {
+    color: var(--sidebar-text);
+    background-color: var(--sidebar-folder-bg-hover);
+}
+/* Drag-over target highlight while a connection row is being dropped. */
+.folder-node.folder-drop-target,
+.folder-node.folder-drop-target:hover {
+    background-color: var(--sidebar-active-bg);
+    color: #fff;
+}
+
+/* ── Working-set separator + header ───────────────────────────────── */
+.working-set-divider {
+    border-top: 1px solid var(--sidebar-border);
+    margin: 10px 12px 0;
+}
+.working-set-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--sidebar-text-dim);
+    padding: 6px 16px 4px;
+}
+
+/* Sidebar collapse */
+.sidebar-collapsed { width: 0 !important; min-width: 0 !important; overflow: hidden; border-right: none; }
+
+.sidebar-empty {
+    padding: 12px 16px;
+    font-size: 12px;
+    color: var(--sidebar-text-dim);
+    line-height: 1.5;
+}
+
+/* ── Notification bell ─────────────────────────────────────────────────────── */
+.notif-anchor { position: relative; display: flex; align-items: center; }
+
+.notif-btn { position: relative; }
+.notif-btn-active { color: var(--sidebar-active-bg) !important; }
+
+.notif-badge {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    background: var(--red);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 700;
+    min-width: 14px;
+    height: 14px;
+    border-radius: 7px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.notif-panel {
+    position: absolute;
+    top: calc(100% + 6px);
+    /* Anchor the panel's LEFT edge to the bell button. The bell lives
+       in the app-header's left region, so extending rightward keeps the
+       panel on-screen. */
+    left: 0;
+    width: 360px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--sidebar-bg);
+    border: 1px solid var(--sidebar-border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 200;
+}
+.notif-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--sidebar-border);
+    position: sticky;
+    top: 0;
+    background: var(--sidebar-bg);
+    z-index: 1;
+}
+.notif-panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--sidebar-text-muted);
+}
+.notif-clear-btn {
+    background: none;
+    border: 1px solid var(--sidebar-border);
+    color: var(--sidebar-text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+.notif-clear-btn:hover { color: var(--sidebar-text); background: var(--sidebar-hover); }
+
+.notif-empty {
+    padding: 16px 14px;
+    font-size: 12px;
+    color: var(--sidebar-text-dim);
+    text-align: center;
+}
+
+/* ── Notification card ──────────────────────────────────────────────────
+   Grid layout:
+     col 1: db-type badge + status dot (spans all three rows)
+     col 2: title / sql / status (stacked)
+     col 3: timestamp (row 1 only)
+     col 4: dismiss × (row 1 only, hover-revealed)
+   The card is clickable to jump to the pane; the × button stops
+   propagation so dismiss doesn't also jump. */
+.notif-item {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 10px;
+    row-gap: 2px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+    border-bottom: 1px solid var(--sidebar-border);
+}
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: var(--sidebar-hover); }
+
+.notif-item-icon {
+    grid-column: 1;
+    grid-row: 1 / span 3;
+    position: relative;
+    align-self: start;
+    margin-top: 1px;
+}
+.notif-item-icon-badge {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 5px;
+    border-radius: 3px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.notif-item-icon-dot {
+    position: absolute;
+    right: -3px;
+    top: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    background: #3fb950;
+    border: 2px solid var(--sidebar-bg);
+}
+.notif-item-icon-dot.notif-dot-err { background: var(--red); }
+
+.notif-item-title {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sidebar-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.notif-item-time {
+    grid-column: 3;
+    grid-row: 1;
+    font-size: 11px;
+    color: var(--sidebar-text-dim);
+    flex-shrink: 0;
+    align-self: center;
+}
+.notif-item-dismiss {
+    grid-column: 4;
+    grid-row: 1;
+    background: none;
+    border: none;
+    color: var(--sidebar-text-dim);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px 0 6px;
+    opacity: 0;
+    transition: opacity 0.1s, color 0.15s;
+}
+.notif-item:hover .notif-item-dismiss { opacity: 1; }
+.notif-item-dismiss:hover { color: var(--sidebar-text); }
+
+.notif-item-sql {
+    grid-column: 2 / span 3;
+    grid-row: 2;
+    font-family: var(--font-mono, monospace);
+    font-size: 11px;
+    color: var(--sidebar-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.notif-item-sql-empty { display: none; }
+
+.notif-item-status {
+    grid-column: 2 / span 3;
+    grid-row: 3;
+    font-size: 11px;
+    color: var(--sidebar-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+.notif-item-status.notif-status-err { color: var(--red); }
+.notif-status-glyph { font-weight: 700; }
+
+
+/* ── Welcome pane ──────────────────────────────────────────────────────────── */
+.welcome {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--text-dim);
+    font-size: 13px;
+}
+.welcome-glyph { font-size: 56px; line-height: 1; }
+.welcome-title { font-size: 18px; color: var(--text-muted); font-weight: 500; }
+.welcome-hint { font-size: 12px; }
+
+/* ── New connection form ───────────────────────────────────────────────────── */
+.conn-form-pane {
+    padding: 32px 40px;
+    max-width: 480px;
+    height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+.conn-form-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: var(--text);
+}
+/* Surfaced above the form when editing a connection that's placed in more
+   than one folder, so the user knows their edit propagates across all
+   linked placements (and didn't expect to be editing a single-location
+   record). */
+.conn-form-link-note {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: rgba(180, 180, 220, 0.08);
+    border-left: 2px solid var(--accent, #6a8aff);
+    padding: 6px 10px;
+    margin: -16px 0 24px 0;
+}
+.form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.form-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); }
+.form-input {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    width: 100%;
+}
+.form-input:focus { border-color: var(--accent); }
+.form-row-inline { display: flex; gap: 12px; }
+.form-row-inline .form-row { flex: 1; }
+.form-actions { display: flex; gap: 10px; margin-top: 20px; }
+
+.btn {
+    border: none;
+    padding: 8px 18px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 13px;
+    font-weight: 500;
+    transition: opacity 0.15s;
+}
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn:not(:disabled):hover { opacity: 0.85; }
+.btn-primary { background: var(--accent); color: #0d1117; }
+.btn-ghost { background: var(--panel-bg); color: var(--text-muted); border: 1px solid var(--border); }
+
+/* ── Shell ─────────────────────────────────────────────────────────────────── */
+.shell { flex: 1; display: flex; flex-direction: column; overflow: hidden; font-family: var(--font-mono); }
+
+.shell-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+    /* `position: relative` establishes a containing block for the absolutely
+     * positioned `.pane-menu` dropdown so it anchors to the ⊡ button in this
+     * toolbar rather than the viewport. */
+    position: relative;
+}
+.shell-conn-name { color: var(--text); font-weight: 600; }
+.shell-version { color: var(--text-muted); }
+.shell-toolbar-plane {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    text-transform: uppercase;
+    margin-left: 8px;
+}
+.shell-toolbar-spacer { flex: 1; }
+
+.txn-badge {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.6px;
+    padding: 1px 8px;
+    border-radius: 3px;
+    margin-left: 6px;
+}
+.txn-active {
+    background: rgba(245, 190, 50, 0.18);
+    color: #e8b730;
+    border: 1px solid rgba(245, 190, 50, 0.35);
+}
+.txn-failed {
+    background: rgba(230, 70, 70, 0.18);
+    color: #e25555;
+    border: 1px solid rgba(230, 70, 70, 0.35);
+}
+
+/* DB session id pill (#NNN) — shown on pane tabs + pane headers so a DBA
+   can correlate a pane with SHOW PROCESSLIST / pg_stat_activity rows. */
+.session-id-pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    background: var(--panel-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+    user-select: text;
+}
+
+/* Shell-block grouping — one wrapper per (Query + its trailing
+   output entries). Carries the right-click contextmenu that surfaces
+   Copy command / Copy output / Copy whole block. Hover renders a
+   faint blue outline so the DBA can clearly see the boundary they're
+   right-clicking over. The 1px inset border replaces a background
+   tint (too subtle at the small contrast available against the
+   shell's dark canvas) without shifting layout — the matching
+   1px transparent border on the resting state reserves the space. */
+.shell-block {
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: border-color 100ms linear;
+}
+.shell-block:hover {
+    border-color: rgba(88, 166, 255, 0.45);
+}
+
+/* Inner region holding a Table/Vertical result. When collapsed
+   (the right-click "Collapse output" menu item toggles this), the
+   `-clipped` modifier caps height at 400px and turns on overflow
+   scrolling so the user can mouse-over-scroll inside the trimmed
+   region. Expanded state is normal flow — the full table renders
+   and the parent scroll context (the shell pane's main scroll)
+   handles overflow. No transition: animating between max-height:none
+   and max-height:400px looks jankier than instant toggle. */
+.shell-collapsed-region {
+    /* nothing — flow layout */
+}
+.shell-collapsed-region-clipped {
+    max-height: 400px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+}
+
+/* Horizontal status strip housing the TXN badge + session-id pill +
+   shell-buffer pill. Lets the three indicators share ONE row (the
+   parent .shell uses flex-direction:column, so direct children were
+   each taking their own row and wasting vertical real estate). */
+.shell-status-strip {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 2px 4px;
+    gap: 0;
+}
+
+/* Shell-buffer-size pill — sits next to .session-id-pill. Same visual
+   shape so they read as a single status-strip. Tooltip directs the
+   DBA to the right-click menu for the Clear action. */
+.shell-buffer-pill {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    background: var(--panel-bg);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+    user-select: text;
+    white-space: pre-line;
+}
+
+/* Reconnect banner — appears at the top of a pane when its server-side
+   session ended (SessionClosed). The pane's structure (history, draft,
+   schema state) is preserved; the banner lets the user re-establish
+   the session without losing context. Distinct from the global
+   WS-disconnect banner (which signals "noctua is unreachable") because
+   this one signals "noctua is fine but THIS pane's DB session ended". */
+.reconnect-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(255, 184, 51, 0.12);
+    color: #c08a1a;
+    border-bottom: 1px solid rgba(255, 184, 51, 0.4);
+    font-size: 12px;
+    flex-shrink: 0;
+}
+.reconnect-banner-icon {
+    font-size: 14px;
+}
+.reconnect-banner-text {
+    flex: 1;
+}
+.reconnect-banner-btn {
+    background: rgba(255, 184, 51, 0.25);
+    color: #8a6112;
+    border: 1px solid rgba(255, 184, 51, 0.5);
+    border-radius: 4px;
+    padding: 3px 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.reconnect-banner-btn:hover {
+    background: rgba(255, 184, 51, 0.4);
+}
+.btn-disconnect {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    cursor: pointer;
+}
+.btn-disconnect:hover { border-color: var(--red); color: var(--red); }
+
+.shell-connecting {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    gap: 10px;
+}
+
+.shell-output {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    cursor: text;
+    user-select: text;
+}
+
+/* Shell history entries */
+.shell-entry-query {
+    display: flex;
+    gap: 8px;
+    color: var(--text-muted);
+}
+.shell-prompt { color: var(--accent); white-space: nowrap; }
+.shell-prompt-error { color: var(--red); }
+
+/* In-flight indicator — renders between the submitted Query entry and the
+   next prompt while tab.querying == true. Makes it unambiguous that a
+   response hasn't landed yet (fixes the lock-blocked UPDATE looking done). */
+.shell-entry-pending {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 4px 0 12px 0;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 13px;
+}
+.shell-pending-glyph {
+    color: var(--accent);
+    animation: shell-pending-pulse 1.2s ease-in-out infinite;
+}
+@keyframes shell-pending-pulse {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 1;    }
+}
+
+/* ── Split panes ───────────────────────────────────────────────────────────── */
+/* Split divider — draggable resize handle between panes */
+/* Placed and sized by pane_layout.rs (DIVIDER_PX). */
+.split-divider {
+    background: var(--border);
+    transition: background 0.15s;
+    touch-action: none; /* prevents scroll during drag */
+}
+.split-divider-h { cursor: col-resize; }
+.split-divider-v { cursor: row-resize; }
+.split-divider:hover,
+.split-divider-active {
+    background: var(--accent);
+}
+
+/* Give each .shell its own scrollable context when inside a split.             */
+.shell { border: 1px solid transparent; transition: border-color 0.1s; }
+.shell:focus-within { border-color: var(--accent); }
+.shell-sql { color: var(--text); white-space: pre-wrap; word-break: break-all; }
+
+/* A statement's status as its CLI prints it. pre-wrap keeps mysql's
+   info line under its "Query OK" line, and its double spaces. */
+.shell-entry-info { color: var(--green); font-size: 12px; padding-left: 4px; white-space: pre-wrap; }
+.shell-entry-error { color: var(--red); font-size: 12px; padding-left: 4px; white-space: pre-wrap; }
+/* Server notices (psql's NOTICE / INFO / WARNING lines). pre-wrap keeps
+   the line breaks in multi-line reports like VACUUM VERBOSE. */
+.shell-notice { color: var(--text-muted); font-size: 12px; padding-left: 4px; white-space: pre-wrap; }
+/* Text a CLI prints as it prints it — psql's `\d`, a non-aligned
+   `\pset format`, each CLI's vertical output — so never wrapped: a wide
+   block scrolls. */
+.shell-printed, .shell-vertical-text {
+    margin: 0;
+    padding-left: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text);
+    background: transparent;
+    white-space: pre;
+    overflow-x: auto;
+}
+/* The relation in a printed title / footer that opens the explorer. */
+.shell-printed-link {
+    color: var(--accent);
+    cursor: pointer;
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+.shell-printed-link:hover { text-decoration: underline; }
+.shell-notice-warning { color: var(--yellow); }
+/* A table's title (\pset title, a list's, a \watch run's), as psql's
+   aligned printer prints it: over the table, scrolling with it. The
+   frame is as wide as the table or the title; the title's first line
+   is centred in a box as wide as its widest line (each line, unseen and
+   drawn from its data-line, sizes it), the rest start at the left — and
+   so does all of it when it's as wide as the table. */
+.shell-table-frame { display: flex; flex-direction: column; width: max-content; }
+.shell-table-frame > .shell-table { align-self: flex-start; }
+.shell-table-title {
+    color: var(--text);
+    font-size: 13px;
+    font-style: italic;
+    white-space: pre;
+    padding: 4px 12px 2px;
+}
+.shell-table-title-first { display: grid; justify-content: center; }
+.shell-table-title-first > span { grid-area: 1 / 1; }
+.shell-table-title-width { visibility: hidden; height: 0; overflow: hidden; }
+.shell-table-title-width::before { content: attr(data-line); }
+
+/* Horizontal table results */
+.shell-table-wrap {
+    overflow-x: auto;
+    margin: 4px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+}
+.shell-table { border-collapse: collapse; font-size: 12px; }
+.shell-table th {
+    padding: 5px 12px;
+    color: var(--accent);
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+}
+/* `pre`: a value's line breaks and spaces show as psql shows them
+   (\dn+ privileges, \du attributes), one row's lines aligned at the top. */
+.shell-table td {
+    padding: 4px 12px;
+    white-space: pre;
+    vertical-align: top;
+    color: var(--text);
+}
+.shell-table tr:hover td { background: var(--panel-bg); }
+/* Each column lines up as the CLI does: numbers right; psql centres its
+   headers, the mysql CLI starts them at the left. */
+.shell-table td.shell-num { text-align: right; }
+.shell-table.shell-table-centred th { text-align: center; }
+.shell-null { color: var(--text-dim); font-style: italic; }
+
+.shell-save-links { color: var(--text-dim); font-size: 11px; }
+.shell-save-link {
+    color: var(--accent);
+    text-decoration: none;
+    cursor: pointer;
+}
+.shell-save-link:hover { text-decoration: underline; }
+
+/* \watch auto-repeat block */
+/* \watch: each run printed as psql prints it — its title over the
+   result — and, while it runs, a bar saying how often and how to stop. */
+.shell-watch-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 6px 0;
+    padding: 4px 12px;
+    border: 1px solid rgba(245, 190, 50, 0.35);
+    border-radius: 4px;
+    background: rgba(245, 190, 50, 0.04);
+}
+.shell-watch-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #e8b730;
+    letter-spacing: 0.5px;
+}
+.shell-watch-stop {
+    font-size: 11px;
+    padding: 2px 10px;
+    border: 1px solid rgba(230, 70, 70, 0.4);
+    border-radius: 3px;
+    background: rgba(230, 70, 70, 0.12);
+    color: #e25555;
+    cursor: pointer;
+}
+.shell-watch-stop:hover {
+    background: rgba(230, 70, 70, 0.25);
+}
+
+/* Ctrl+R reverse search bar */
+.shell-search-bar {
+    padding: 4px 12px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    background: var(--panel-bg);
+    border-top: 1px solid var(--border);
+}
+.shell-search-term {
+    color: var(--accent);
+    font-weight: 600;
+}
+.shell-search-match {
+    color: var(--text);
+}
+.shell-search-label {
+    color: var(--text-dim);
+}
+
+/* Safe-mode confirmation prompt */
+.shell-confirm-block {
+    margin: 8px 0;
+    border: 1px solid rgba(230, 70, 70, 0.35);
+    border-radius: 4px;
+    background: rgba(230, 70, 70, 0.04);
+    padding: 8px 12px;
+}
+.shell-confirm-warn {
+    font-size: 12px;
+    font-weight: 600;
+    color: #e25555;
+}
+.shell-confirm-sql {
+    margin: 6px 0;
+    padding: 6px 8px;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    white-space: pre-wrap;
+}
+.shell-confirm-overflow {
+    margin: 4px 2px 8px 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+.shell-confirm-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+.shell-confirm-execute {
+    font-size: 11px;
+    padding: 3px 12px;
+    border: 1px solid rgba(230, 70, 70, 0.5);
+    border-radius: 3px;
+    background: rgba(230, 70, 70, 0.15);
+    color: #e25555;
+    cursor: pointer;
+    font-weight: 600;
+}
+.shell-confirm-execute:hover { background: rgba(230, 70, 70, 0.3); }
+.shell-confirm-cancel {
+    font-size: 11px;
+    padding: 3px 12px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: none;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.shell-confirm-cancel:hover { background: rgba(255, 255, 255, 0.06); }
+
+/* Vertical results (psql's `\x`, mysql's `\G`): the CLI's text, then the footer. */
+.shell-vertical-block { margin: 4px 0; }
+
+.shell-stat { color: var(--text-muted); font-size: 11px; padding-left: 4px; margin-top: 2px; }
+/* A list's own footers under its rows, in place of the row count
+   (psql's `\dn` `Publications:`), as the rows' own text. */
+.shell-table-footers { color: var(--text); font-size: 12px; white-space: pre; padding-left: 4px; margin-top: 2px; }
+/* psql's "Time: 0.205 ms", a line of its own under the result. */
+.shell-timing { color: var(--text-muted); font-size: 11px; padding-left: 4px; margin-top: 4px; }
+
+/* Meta-command output (\h, \s results rendered as text) */
+.shell-meta-output { padding-left: 4px; margin: 2px 0; }
+.shell-meta-line { color: var(--text-muted); font-size: 12px; line-height: 1.7; white-space: pre; }
+/* An empty line is a line, as the CLI prints it (mysql's empty `\p`). */
+.shell-meta-line:empty { min-height: 1.7em; }
+
+/* SQL syntax highlighting (history entries) */
+.sql-kw-major { color: var(--accent); font-weight: 700; }
+.sql-kw      { color: var(--accent); }
+.sql-fn      { color: var(--yellow); }
+.sql-str     { color: var(--green); }
+.sql-num     { color: var(--cyan, #56b6c2); }
+.sql-comment { color: var(--text-dim); font-style: italic; }
+.sql-bt      { color: var(--text-muted); }
+/* Key-value display (\s, \conninfo) */
+.shell-kv-block {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1px 12px;
+    margin: 4px 0;
+    padding: 2px 4px;
+}
+.shell-kv-key {
+    text-align: right;
+    color: var(--purple);
+    white-space: nowrap;
+}
+.shell-kv-val {
+    color: var(--text);
+}
+
+.sql-op      { color: var(--purple); }
+.sql-bracket { color: var(--text); font-weight: 700; }
+.sql-punct   { color: var(--text-muted); }
+.sql-plain   { color: var(--text); }
+
+/* ── Per-pane mini-tab-bar (shown inside a leaf when it has >1 tab) ─────────── */
+/* Fills its .pane-leaf-bar, which pane_layout.rs places (TAB_BAR_PX high). */
+.pane-tab-bar {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    flex-shrink: 0;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    overflow: visible;
+    position: relative;
+    padding-right: 8px;
+}
+.pane-tab {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    color: var(--text-muted);
+    cursor: pointer;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    user-select: none;
+    transition: background 0.1s;
+    min-width: 0;
+    max-width: 160px;
+}
+.pane-tab:hover { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.pane-tab-active {
+    background: var(--main-bg);
+    color: var(--text);
+    border-top: 2px solid var(--accent);
+}
+/* Zoom (tmux-style) — amber top border on the active tab while zoomed
+   signals that other panes are hidden. Double-click toggles. */
+.pane-tab-active.pane-tab-zoomed {
+    border-top-color: var(--yellow);
+}
+.pane-tab-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.pane-tab-close {
+    font-size: 12px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: color 0.1s, background 0.1s;
+}
+.pane-tab-close:hover { color: var(--text); background: var(--sidebar-hover); }
+/* Dirty indicator — close button shows an amber ● when the pane has
+   typed-but-unsubmitted input. Hover reverts to × so close still works.
+   Implementation: the underlying "×" text-node gets color:transparent
+   (stays in the flow to reserve space) and the ::before pseudo draws
+   the visible glyph — ● in yellow normally, × in text-color on hover. */
+.pane-tab-close-dirty {
+    color: transparent;
+    position: relative;
+}
+.pane-tab-close-dirty::before {
+    content: "●";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--yellow);
+    font-size: 11px;
+}
+.pane-tab-close-dirty:hover::before {
+    content: "×";
+    color: var(--text);
+    font-size: 14px;
+}
+/* Activity dot — small colored circle before the pane icon; green/red by
+   notification severity. Reactive on the global notifications queue. */
+.pane-tab-activity-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+.pane-tab-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-muted);
+}
+.pane-tab-icon svg {
+    width: 13px;
+    height: 12px;
+}
+.pane-tab-active .pane-tab-icon { color: var(--accent); }
+.pane-tab-stale {
+    display: inline-flex;
+    align-items: center;
+    color: #ff5050;
+    font-size: 12px;
+    line-height: 1;
+    margin-right: 2px;
+    flex-shrink: 0;
+}
+
+/* ── Tab rename input — swaps in for the .pane-tab-label span ─────── */
+.pane-tab-rename-input,
+.slot-rename-input {
+    background: var(--main-bg);
+    color: var(--text);
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 1.4;
+    padding: 1px 4px;
+    min-width: 0;
+    max-width: 140px;
+    outline: none;
+}
+.slot-rename-input {
+    flex: 1;
+    max-width: none;
+}
+.slot-row-orphan {
+    opacity: 0.55;
+    cursor: default;
+}
+.slot-row-orphan:hover { background: transparent; }
+.slot-row-orphan .conn-name::after {
+    content: " (orphan)";
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* ── Tab right-click context menu ─────────────────────────────────── */
+.tab-context-menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: transparent;
+}
+.tab-context-menu {
+    position: fixed;
+    z-index: 1001;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    min-width: 180px;
+    padding: 4px 0;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text);
+    user-select: none;
+}
+.tab-context-menu-item {
+    padding: 6px 14px;
+    cursor: pointer;
+}
+.tab-context-menu-item:hover {
+    background: var(--accent);
+    color: #fff;
+}
+.tab-context-menu-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+/* ── In-app modal dialog (prompt / confirm) ─────────────────────────
+   Replaces window.prompt / window.confirm to avoid surfacing the
+   browser-chrome "localhost:8080 says" framing. Backdrop dims the
+   page; the dialog itself sits centered with a thin shadow. */
+.app-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1500;
+    background: rgba(0, 0, 0, 0.45);
+}
+.app-dialog {
+    position: fixed;
+    z-index: 1501;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 360px;
+    max-width: 540px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+    padding: 20px 22px 16px 22px;
+    font-family: var(--font-ui);
+    color: var(--text);
+}
+.app-dialog-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+.app-dialog-message {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+.app-dialog-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: var(--font-ui);
+    color: var(--text);
+    background: var(--input-bg, #1e1e26);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-bottom: 16px;
+}
+.app-dialog-input:focus {
+    outline: none;
+    border-color: var(--accent, #6a8aff);
+}
+.app-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+/* Wider dialog for forms (Settings). Scrolls inside a short window. */
+.app-dialog.app-dialog-wide {
+    width: 560px;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+.app-dialog:focus { outline: none; }
+
+/* ── Settings dialog ────────────────────────────────────────────────
+   Dark like the workspace: inputs sit a shade darker than the dialog
+   so their edges read, and status lines pair colour with plain text. */
+.settings-dialog .form-input {
+    background: var(--main-bg);
+    color: var(--text);
+}
+.settings-section {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin: 4px 0 8px 0;
+}
+.settings-lede,
+.settings-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+}
+.settings-lede { margin-bottom: 14px; }
+.settings-notice {
+    font-size: 12px;
+    color: var(--text);
+    background: rgba(210, 153, 34, 0.12);
+    border-left: 2px solid var(--yellow);
+    padding: 6px 10px;
+    margin-bottom: 14px;
+    line-height: 1.4;
+}
+.settings-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin: 4px 0 14px 0;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.settings-status.settings-status-ok  { color: var(--green); }
+.settings-status.settings-status-err { color: var(--red); }
+/* Danger variant of `.btn btn-primary` for destructive verbs (Delete
+   connection, Delete folder). Red so users hesitate before clicking. */
+.btn.btn-danger {
+    background: #b03c3c;
+    color: #fff;
+    border: 1px solid #b03c3c;
+}
+.btn.btn-danger:hover {
+    background: #c64b4b;
+    border-color: #c64b4b;
+}
+
+/* ── Tab-completion popup ───────────────────────────────────────────
+   Anchored below the shell input via fixed positioning + inline left/top
+   computed from the textarea's getBoundingClientRect. Same body-portal
+   pattern as the right-click context menus. */
+.completion-popup-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: transparent;
+}
+.completion-popup {
+    position: fixed;
+    z-index: 1101;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    padding: 4px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    min-width: 200px;
+    max-height: 50vh;
+    overflow-y: auto;
+    user-select: none;
+    color: var(--text);
+}
+.completion-popup-item {
+    padding: 4px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.completion-popup-item:hover {
+    background: rgba(88, 166, 255, 0.10);
+}
+/* Keyboard-selected item — Tab cycles, the active row gets this style
+   so cycling without a mouse stays visible. */
+.completion-popup-item-selected {
+    background: var(--accent);
+    color: #fff;
+}
+.completion-popup-item-selected:hover {
+    background: var(--accent);
+}
+
+/* Disabled menu items — greyed out, no hover, click is a no-op. Used
+   when a verb doesn't apply in the current context (Paste with empty
+   clipboard, Remove-from-folder when source_path is empty, etc.) so the
+   menu layout stays consistent across right-click targets. */
+.tab-context-menu-item-disabled {
+    color: var(--text-muted, #888);
+    cursor: default;
+}
+.tab-context-menu-item-disabled:hover {
+    background: transparent;
+    color: var(--text-muted, #888);
+}
+/* Danger-styled item (Delete connection, Delete folder). Red text so
+   destructive verbs are visually distinguished from neutral ones. */
+.tab-context-menu-item-danger {
+    color: #d97373;
+}
+.tab-context-menu-item-danger:hover {
+    background: #b03c3c;
+    color: #fff;
+}
+
+/* ── Inline shell input (lives in the scroll flow, not a fixed footer) ─────── */
+/* Wrapper takes the flex slot so the overlay div can absolutely-position
+   itself behind the textarea. The textarea fills the wrapper. */
+.shell-input-wrap {
+    flex: 1;
+    position: relative;
+    display: block;
+    min-width: 0;
+}
+/* While `\e` waits on the external editor the input is read-only: dim
+   it, and show a one-line note under the prompt saying how to get out. */
+.shell-input-wrap:has(.shell-input-inline:read-only) .shell-input-highlight { opacity: 0.55; }
+.shell-editing-note {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text-muted);
+    background: transparent;
+    border-left: 2px solid var(--accent);
+    padding: 2px 0 2px 8px;
+    margin: 4px 0 0 0;
+}
+/* Token-colored render of the live input, painted behind a transparent-text
+   textarea. Every text-metric here must match `.shell-input-inline` exactly
+   — drift by 1px and characters mis-register with their colors. */
+.shell-input-highlight {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 0;
+    border: none;
+    margin: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
+    tab-size: 4;
+}
+.shell-input-inline {
+    width: 100%;
+    display: block;
+    background: transparent;
+    border: none;
+    /* Native text is invisible; the overlay paints colored tokens behind it.
+       Caret stays visible via caret-color. */
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    resize: none;
+    outline: none;
+    min-height: 21px;
+    overflow: hidden;
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    white-space: pre-wrap;
+    word-break: break-all;
+    tab-size: 4;
+    caret-color: var(--accent);
+    position: relative;  /* stack above the overlay */
+    z-index: 1;
+}
+
+/* ── Schema explorer panel ─────────────────────────────────────────────────── */
+
+/* Outer container — row flex: [tree col] [detail col] */
+.explorer-panel {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--sidebar-border);
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* ── Tree column ─── */
+.explorer-tree-col {
+    width: 200px;
+    min-width: 160px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-right: 1px solid var(--sidebar-border);
+}
+
+.explorer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px 4px 12px;
+    border-bottom: 1px solid var(--sidebar-border);
+    flex-shrink: 0;
+}
+.explorer-header-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+.explorer-refresh-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 2px 5px;
+    font-size: 13px;
+    line-height: 1;
+    border-radius: 3px;
+    transition: color 0.15s, background 0.15s;
+}
+.explorer-refresh-btn:hover { color: var(--text); background: var(--sidebar-hover); }
+
+.explorer-tree {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+/* Tree nodes */
+.explorer-db-node {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    transition: background 0.1s;
+}
+.explorer-db-node:hover { background: var(--sidebar-hover); color: var(--text); }
+
+.explorer-table-node {
+    display: flex;
+    align-items: center;
+    padding: 3px 8px 3px 22px;
+    cursor: pointer;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 11px;
+    transition: background 0.1s;
+}
+.explorer-table-node:hover { background: var(--sidebar-hover); color: var(--text-muted); }
+
+/* Selected state — highlighted in accent */
+.explorer-node-selected {
+    background: var(--sidebar-active) !important;
+    color: var(--accent) !important;
+}
+
+.explorer-chevron { color: var(--text-dim); font-size: 9px; flex-shrink: 0; width: 10px; }
+.explorer-node-name { overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+
+.explorer-loading, .explorer-empty {
+    padding: 5px 12px;
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+}
+.explorer-error {
+    padding: 6px 12px;
+    font-size: 11px;
+    color: var(--red);
+    white-space: pre-wrap;
+    font-family: var(--font-ui);
+}
+.explorer-error-retry {
+    margin-top: 6px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    background: var(--bg-elev);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+}
+.explorer-error-retry:hover {
+    background: var(--bg-hover);
+}
+
+/* ── Detail column ─── */
+.explorer-detail-col {
+    width: 420px;
+    min-width: 320px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--main-bg);
+}
+
+.detail-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Object header: icon + title + subtitle */
+.detail-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    background: var(--panel-bg);
+}
+.detail-header-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+    line-height: 1;
+}
+.detail-icon-db    { color: var(--accent); }
+.detail-icon-table { color: var(--green); }
+.detail-title-block { min-width: 0; }
+.detail-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    font-family: var(--font-mono);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.detail-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: var(--font-mono);
+}
+
+/* Section label */
+.detail-section-label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    padding: 10px 16px 6px;
+    flex-shrink: 0;
+    font-family: var(--font-ui);
+}
+
+.detail-msg {
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+}
+/* Small badge next to the Visibility Map section header showing which
+   SQL path the plane picked (pg_visibility for fresh per-page reads,
+   pg_class for the vacuum-snapshot fallback). Green when the extension
+   path is in use; muted when we fell back — telegraphs "install the
+   extension for fresher numbers" without a scolding tone. */
+.storage-vm-source {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+}
+.storage-vm-source-fresh {
+    background-color: rgba(21, 128, 61, 0.12);
+    color: var(--ex-green);
+}
+.storage-vm-source-fallback {
+    background-color: rgba(107, 111, 120, 0.12);
+    color: var(--ex-muted);
+}
+
+/* ── Storage tab: Autovacuum section ─────────────────────────────────
+   Two compact tables on the .schema-table look (Columns / Indexes):
+   Triggers (one row per autovacuum trigger, read left to right as PG's
+   formula) and Settings (every knob by its real reloption name).
+   `width: auto` keeps each table as wide as its content so values sit
+   next to their labels; the 4px margin lines the first column up with
+   the 16px section header. Only the Progress column carries severity
+   colour — overrides get the accent dot instead, so amber means one
+   thing. Scoped under .explorer-shell, where the --ex-* tokens live. */
+.explorer-shell .av-table {
+    width: auto;
+    margin: 2px 4px 0;
+}
+.explorer-shell .av-table + .av-table,
+.explorer-shell .av-legend + .av-table { margin-top: 14px; }
+.explorer-shell .av-table .av-num { text-align: right; }
+/* Cell colours are qualified with `.av-table td` so they outrank the
+   theme's `.explorer-shell .schema-table td { color }` (0,2,1), which
+   sits later in the file. */
+/* Row labels: trigger names, Visibility map states, Geometry keys. */
+.explorer-shell .av-trigger,
+.explorer-shell .av-key { font-weight: 600; }
+/* Severity on a key/value cell (Geometry). */
+.explorer-shell .av-table td.metric-good  { color: #6a9955; font-weight: 600; }
+.explorer-shell .av-table td.metric-watch { color: #c9a233; font-weight: 600; }
+.explorer-shell .av-table td.metric-bad   { color: #b03c3c; font-weight: 600; }
+.explorer-shell .av-table td.av-measures,
+.explorer-shell .av-table td.av-note,
+.explorer-shell .av-table td.av-rule,
+.explorer-shell .av-dim { color: var(--ex-muted); }
+.explorer-shell .av-rule .av-ovr { color: var(--ex-text); }
+/* Value set on this table: text weight + accent dot. The legend under
+   the Triggers table reuses the same span with no text. */
+.explorer-shell .av-ovr { font-weight: 600; }
+.explorer-shell .av-ovr::after {
+    content: "\2022";
+    color: var(--ex-accent);
+    margin-left: 2px;
+    font-weight: 700;
+}
+.explorer-shell .av-legend {
+    margin: 2px 16px 0;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    color: var(--ex-muted);
+}
+/* Progress: thin bar on the explorer's border tone, severity fill,
+   percentage beside it. The fill caps at 100%; the number doesn't. */
+.explorer-shell .av-progress { white-space: nowrap; }
+.explorer-shell .av-bar {
+    display: inline-block;
+    width: 84px;
+    height: 6px;
+    margin-right: 8px;
+    vertical-align: middle;
+    border-radius: 3px;
+    background-color: var(--ex-border);
+    overflow: hidden;
+}
+.explorer-shell .av-bar-fill {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background-color: var(--ex-muted);
+}
+.explorer-shell .av-bar-fill.metric-good  { background-color: #6a9955; }
+.explorer-shell .av-bar-fill.metric-watch { background-color: #c9a233; }
+.explorer-shell .av-bar-fill.metric-bad   { background-color: #b03c3c; }
+.explorer-shell .av-pct { display: inline-block; min-width: 52px; text-align: right; }
+.explorer-shell .av-pct.metric-good  { color: #6a9955; font-weight: 600; }
+.explorer-shell .av-pct.metric-watch { color: #c9a233; font-weight: 600; }
+.explorer-shell .av-pct.metric-bad   { color: #b03c3c; font-weight: 600; }
+/* A trigger that can't fire (autovacuum off, insert vacuums disabled)
+   stays in place, muted, with the reason where the bar would be. */
+.explorer-shell .av-table .av-row-inactive td { color: var(--ex-dim); }
+.explorer-shell .av-inactive-reason { color: var(--ex-muted); font-style: italic; }
+/* Settings: group breaks are spacing, not rules (no row separators). */
+.explorer-shell .av-settings .av-group-start td { padding-top: 10px; }
+.explorer-shell .av-value-table { font-weight: 600; }
+.explorer-shell .av-source { font-family: var(--font-ui); font-size: 11px; }
+.explorer-shell .av-table td.av-source-table   { color: var(--ex-accent); font-weight: 600; }
+.explorer-shell .av-table td.av-source-cluster { color: var(--ex-text); }
+.explorer-shell .av-table td.av-source-default { color: var(--ex-muted); }
+.explorer-shell .av-banner {
+    margin: 4px 16px 8px;
+    padding: 6px 10px;
+    border-left: 3px solid var(--ex-red);
+    background-color: var(--ex-panel);
+    color: var(--ex-text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+}
+.explorer-shell .av-prose {
+    margin: 4px 16px 8px;
+    max-width: 72ch;
+    color: var(--ex-muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.5;
+}
+/* Inspector ↻ spins while a refetch is in flight; values stay on
+   screen meanwhile (see refresh_table_detail). */
+.explorer-refresh.refreshing { animation: explorer-refresh-spin 0.9s linear infinite; }
+@keyframes explorer-refresh-spin { to { transform: rotate(360deg); } }
+/* Run action sub-header — one level below .schema-section-header. */
+.storage-autovac-subheader {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+    padding: 16px 16px 4px;
+}
+
+/* Autovacuum "Run action" panel — checkbox row + SQL preview + Run
+   button + inline error. Compact horizontal layout for the
+   checkboxes so all four fit on one line; the preview box below
+   shows the composed SQL live as the DBA toggles. */
+.storage-autovac-action {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px 20px;
+    padding: 4px 16px 8px;
+    font-family: var(--font-ui);
+    font-size: 12px;
+}
+.storage-autovac-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+}
+.storage-autovac-checkbox input[type="checkbox"] {
+    margin: 0;
+    cursor: pointer;
+}
+.storage-autovac-checkbox-disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.storage-autovac-checkbox-disabled input[type="checkbox"] {
+    cursor: not-allowed;
+}
+.storage-autovac-preview {
+    padding: 6px 16px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    background-color: rgba(128, 128, 128, 0.08);
+    margin: 4px 16px;
+    border-radius: 3px;
+    word-break: break-word;
+}
+.storage-autovac-run-row {
+    padding: 0 16px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.storage-autovac-run {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background-color: var(--panel-bg, transparent);
+    color: var(--text);
+    cursor: pointer;
+}
+.storage-autovac-run:hover:not(:disabled) {
+    background-color: var(--ex-hover);
+    color: var(--ex-text);
+}
+.storage-autovac-run:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+.storage-autovac-error {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ex-red);
+}
+/* Run status beside the button: what the last command is doing in the
+   explorer's action shell, plus a link that brings that shell to the
+   front. The link is a button reset to read as a link. */
+.explorer-shell .av-run-status { font-family: var(--font-ui); font-size: 12px; color: var(--ex-muted); }
+.explorer-shell .av-run-done   { color: var(--ex-green); }
+.explorer-shell .av-run-failed { color: var(--ex-red); }
+.explorer-shell .av-run-closed { font-style: italic; }
+.explorer-shell .av-run-link {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--ex-accent);
+    background-color: transparent;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+}
+.explorer-shell .av-run-link:hover { color: var(--ex-text); }
+.detail-error {
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--red);
+    font-family: var(--font-ui);
+}
+
+/* Scrollable table area */
+.detail-table-wrap {
+    flex: 1;
+    overflow: auto;
+    border-top: 1px solid var(--border);
+}
+
+/* Detail data table */
+.detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.detail-table th {
+    position: sticky;
+    top: 0;
+    padding: 6px 12px 6px 8px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+.detail-table td {
+    padding: 5px 12px 5px 8px;
+    border-bottom: 1px solid var(--sidebar-border);
+    color: var(--text);
+    white-space: nowrap;
+}
+.detail-table tr:last-child td { border-bottom: none; }
+.detail-table tr:hover td { background: var(--panel-bg); }
+.detail-table-row-clickable { cursor: pointer; }
+
+/* PK row — subtle left accent */
+.detail-row-pk td:first-child { border-left: 2px solid var(--yellow); }
+
+/* Column key cell */
+.col-key       { width: 28px; text-align: center; padding: 6px 4px !important; }
+.col-key-cell  { width: 28px; text-align: center; padding: 5px 4px !important; }
+.col-key-icon  {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 3px;
+    border-radius: 3px;
+    letter-spacing: 0;
+    font-family: var(--font-ui);
+    line-height: 1.4;
+}
+.col-key-pk  { background: rgba(210,153,34,0.2); color: var(--yellow); }
+.col-key-uni { background: rgba(188,140,255,0.2); color: var(--purple); }
+.col-key-mul { background: rgba(63,185,80,0.15);  color: var(--green); }
+
+/* Column cells */
+.col-name    { color: var(--text); font-weight: 500; }
+.col-type    { color: var(--accent); }
+.col-null    { color: var(--text-muted); font-size: 11px; }
+.col-null-yes { color: var(--text-dim); }
+.col-default { color: var(--text-muted); font-size: 11px; }
+.col-extra   { color: var(--text-dim); font-size: 11px; }
+
+/* Clickable table name rows in db detail */
+.detail-td-name { color: var(--text-muted); padding-left: 16px !important; }
+.detail-table-row-clickable:hover .detail-td-name { color: var(--accent); }
+
+/* Detail tab strip (Overview / Columns / Indexes / DDL) */
+.detail-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 6px 12px 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    flex-shrink: 0;
+}
+.detail-tab-btn {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    padding: 6px 10px 7px;
+    cursor: pointer;
+    letter-spacing: 0.3px;
+}
+.detail-tab-btn:hover { color: var(--text); }
+.detail-tab-active {
+    color: var(--accent) !important;
+    border-bottom-color: var(--accent);
+}
+
+/* Overview key column */
+.overview-key {
+    width: 130px;
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ── Data tab (per-table read-only browse) ─────────────────────────── */
+.data-tab {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.data-filter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--main-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+}
+.data-filter-label {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    flex-shrink: 0;
+    cursor: help;
+}
+.data-filter-input {
+    background: var(--panel-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.4;
+    outline: none;
+}
+.data-filter-input:focus {
+    border-color: var(--accent);
+}
+.data-filter-server {
+    flex: 2;
+    min-width: 200px;
+}
+.data-filter-client {
+    flex: 1;
+    min-width: 120px;
+}
+.data-filter-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+    flex-shrink: 0;
+}
+.data-cell-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+.data-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+}
+.data-pg-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 2px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    line-height: 1.4;
+}
+.data-pg-btn:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--accent);
+}
+.data-pg-btn:disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+.data-pg-label {
+    color: var(--text-muted);
+    padding: 0 6px;
+}
+.data-pg-spacer { flex: 1; }
+.data-pg-meta {
+    color: var(--text-muted);
+    font-style: italic;
+}
+.data-refresh-btn {
+    margin-left: 6px;
+}
+.data-pg-select {
+    background: var(--main-bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    cursor: pointer;
+}
+.data-col-pk,
+.data-col-fk {
+    display: inline-block;
+    margin-right: 4px;
+    font-size: 10px;
+    line-height: 1;
+    vertical-align: middle;
+    cursor: help;
+}
+.data-col-pk { filter: hue-rotate(0deg); }
+.data-col-fk { opacity: 0.7; }
+/* Container for the data grid PLUS its delete-confirmation banner.
+   Flex column so the banner takes its natural height and the scroll
+   area fills the rest. `min-height: 0` is required for the inner
+   scroll to behave correctly inside a flex parent. */
+.data-grid-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+.data-grid-scroll {
+    flex: 1;
+    overflow: auto;
+}
+/* Inline confirmation shown after the user clicks "−" with a row
+   selected. Red-tinted background + red border so it can't be
+   missed; PK summary in accent color so the user can verify the
+   target before committing. */
+.data-delete-banner {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    background: rgba(255, 80, 80, 0.10);
+    border-bottom: 1px solid rgba(255, 80, 80, 0.5);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.data-delete-banner-text {
+    flex: 1;
+    color: var(--text);
+}
+.data-delete-banner-pk {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+.data-delete-banner-error {
+    color: #e0524d;
+    font-size: 11px;
+    margin-right: 8px;
+}
+/* Inside the banner, `.data-pg-btn`'s explicit `color: var(--text)`
+   wins over the banner's own color rule via specificity, leaving the
+   Cancel button as light-text-on-cream (invisible) inside the schema
+   explorer scope. Force inheritance from the banner so the button
+   text picks up whichever theme color the banner is using. The
+   confirm-btn rule that follows shares the descendant-selector
+   specificity (0,2,0) and comes later in source order, so its red
+   accent wins for the Delete button only. */
+.data-delete-banner .data-pg-btn { color: inherit; }
+.data-delete-banner .data-delete-confirm-btn {
+    color: #e0524d;
+    border-color: rgba(255, 80, 80, 0.5);
+}
+.data-delete-banner-disabled {
+    background: rgba(120, 120, 120, 0.10);
+    border-bottom-color: rgba(120, 120, 120, 0.5);
+}
+.explorer-shell .data-delete-banner {
+    background: rgba(220, 60, 60, 0.08);
+    border-bottom-color: rgba(220, 60, 60, 0.4);
+    color: var(--ex-text);
+}
+.explorer-shell .data-delete-banner-text { color: var(--ex-text); }
+.explorer-shell .data-delete-banner-pk   { color: var(--ex-accent); }
+.data-grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.data-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    padding: 6px 12px;
+    background: var(--panel-bg);
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid var(--border);
+    color: var(--text);
+    font-weight: 600;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+}
+.data-grid thead th:hover {
+    /* Inside the schema explorer (light-cream theme) --ex-hover is the
+       cream-tinted hover bg; --bg-hover wasn't defined so the previous
+       rule rendered as transparent → cream showed through → light text
+       on cream = unreadable. Fall back to the workspace's panel-bg
+       outside that scope. Same logic for color so contrast holds in
+       both themes. */
+    background: var(--ex-hover, var(--panel-bg));
+    color: var(--ex-text, var(--text));
+}
+.data-sort-arrow {
+    color: var(--accent);
+    font-weight: 700;
+}
+.data-cell {
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+}
+.data-cell-null {
+    color: var(--text-dim);
+    font-style: italic;
+}
+.data-grid tbody tr:hover .data-cell {
+    background: var(--bg-hover);
+}
+.data-row {
+    cursor: pointer;
+}
+.data-row-selected .data-cell {
+    background: rgba(var(--accent-rgb, 100, 150, 220), 0.15);
+}
+.data-row-selected:hover .data-cell {
+    background: rgba(var(--accent-rgb, 100, 150, 220), 0.22);
+}
+.data-cell-editable {
+    /* Subtle dotted underline to hint the cell is double-clickable.
+       Only on hover so the grid doesn't look noisy at rest. */
+    cursor: text;
+}
+.data-cell-editable:hover {
+    box-shadow: inset 0 -1px 0 rgba(120, 160, 220, 0.4);
+}
+.data-cell-saving {
+    background: rgba(255, 200, 0, 0.15);
+}
+.data-cell-saved {
+    background: rgba(80, 200, 120, 0.20);
+    transition: background 0.4s ease;
+}
+.data-cell-failed {
+    background: rgba(255, 80, 80, 0.15);
+    box-shadow: inset 0 0 0 1px rgba(255, 80, 80, 0.6);
+}
+/* Cell-level focus — the active grid cell gets a 1.5px accent border
+   on all four sides, the standard spreadsheet "active cell" cue.
+   Sits on top of `.data-row-selected` (which is the wider light-blue
+   band on the row), so row + column focus combine without conflict. */
+.data-cell-focus {
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+/* When a cell is BOTH focused AND in a failed state, both rings
+   need to be visible — losing the red diagnostic on the cursor
+   cell would mask a save-failure exactly when the user is about
+   to retry. We layer them: accent on the outer 1.5px edge (so
+   the focus indicator stays prominent) with the red ring sitting
+   1px deeper, visible as a red band immediately inside the accent. */
+.data-cell-focus.data-cell-failed {
+    box-shadow:
+        inset 0 0 0 1.5px var(--accent),
+        inset 0 0 0 2.5px rgba(255, 80, 80, 0.6);
+}
+.data-cell-input {
+    /* Hard-coded white background + dark text for the editor — the
+       universal "type here" affordance, legible in every theme. Don't
+       use var(--main-bg) here: it's defined in :root as workspace dark
+       (#0d1117), so the fallback never fires and the input renders
+       black-on-black. Border tinted with the accent for focus. */
+    width: 100%;
+    box-sizing: border-box;
+    background: #ffffff;
+    color: #1a1a1a;
+    border: 1px solid var(--accent, #1f6feb);
+    border-radius: 2px;
+    padding: 2px 6px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    outline: none;
+}
+.data-cell-input:focus {
+    box-shadow: 0 0 0 2px rgba(31, 111, 235, 0.25);
+}
+
+/* ── Vertical row projection ──────────────────────────────────────── */
+.data-vertical {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.data-vertical-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    font-family: var(--font-ui);
+    font-size: 11px;
+}
+.data-vertical-pos {
+    color: var(--text-muted);
+    padding: 0 6px;
+}
+.data-vertical-scroll {
+    flex: 1;
+    overflow: auto;
+    padding: 12px 16px;
+}
+.data-vertical-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+/* Right-aligned key column with a ":" separator drawn via ::after so
+   the punctuation stays attached to the label even when the value cell
+   wraps onto multiple lines. No row borders — the schema explorer's
+   theme set already gives enough vertical rhythm without them. */
+.data-vertical-key {
+    text-align: right;
+    vertical-align: top;
+    padding: 6px 12px 6px 0;
+    color: var(--ex-muted, var(--text-muted));
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    width: 1%;
+    min-width: 140px;
+}
+.data-vertical-key::after {
+    content: " :";
+    color: var(--ex-dim, var(--text-dim));
+}
+.data-vertical-val {
+    padding: 6px 0;
+    /* No explicit color — inherits from the schema explorer's --ex-text
+       (or the host page's --text in non-explorer contexts), which is
+       higher-contrast than var(--text) was rendering as. */
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+}
+/* Insert-form additions: per-row column-type hint shown in muted
+   text after the key, full-width input for the value, and the
+   in-flight status pill (Saving / Saved / Failed). */
+.data-insert-type-hint {
+    display: inline-block;
+    margin-left: 6px;
+    color: var(--ex-dim, var(--text-dim));
+    font-weight: 400;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.data-insert-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+.data-insert-status {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ex-muted, var(--text-muted));
+}
+.data-insert-status-saved {
+    color: var(--green, #2ea043);
+}
+.data-insert-status-failed {
+    color: #e0524d;
+}
+.data-insert-upsert-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 4px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+}
+.data-insert-upsert-label:has(input:disabled) { cursor: default; opacity: 0.5; }
+.explorer-shell .data-insert-upsert-label { color: var(--ex-muted); }
+.data-filter-first {
+    padding: 24px;
+    color: var(--text);
+    font-family: var(--font-ui);
+}
+.data-filter-first-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--accent);
+}
+.data-filter-first-body {
+    font-size: 12px;
+    line-height: 1.6;
+    margin-bottom: 14px;
+    max-width: 60ch;
+    color: var(--text-muted);
+}
+.data-filter-first-btn {
+    background: var(--accent);
+    color: var(--main-bg);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 600;
+}
+.data-filter-first-btn:hover { opacity: 0.9; }
+
+/* DDL preformatted block */
+.detail-ddl {
+    margin: 0;
+    padding: 12px 16px;
+    overflow: auto;
+    flex: 1;
+    background: var(--main-bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    border-top: 1px solid var(--border);
+}
+
+/* View nodes (vs base tables) get a slightly muted look in the tree */
+.explorer-node-view .explorer-node-name {
+    font-style: italic;
+    color: var(--text-muted);
+}
+
+/* ── Schema Explorer — Admin tab ────────────────────────────────────────── */
+/* Phase A: navigation only. Areas grouped by scope; clicking an area shows
+   a placeholder inspector that future phases will replace with per-area
+   management views. */
+.explorer-typebar-divider {
+    display: inline-block;
+    width: 1px;
+    background: var(--border);
+    margin: 4px 8px;
+    align-self: stretch;
+}
+/* Horizontal admin sub-toolbar — replaces the previous vertical list, lives
+   between the main typebar and the body so the body keeps full vertical
+   space for the selected area's content. Buttons grouped by AdminScope
+   with a tiny scope label preceding each group. */
+.admin-subtoolbar {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    overflow-x: auto;
+    flex-wrap: nowrap;
+}
+.admin-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+.admin-group + .admin-group {
+    /* Vertical divider between scope groups so the eye groups buttons
+       inside one scope without needing a heavy section header. */
+    margin-left: 12px;
+    padding-left: 12px;
+    border-left: 1px solid var(--border);
+}
+.admin-group-label {
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-muted);
+    margin-right: 8px;
+    user-select: none;
+}
+.admin-area-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    transition: background 100ms ease-out, color 100ms ease-out;
+    white-space: nowrap;
+}
+.admin-area-btn:hover {
+    background: rgba(88, 166, 255, 0.06);
+    color: var(--accent);
+}
+.admin-area-btn-active {
+    background: rgba(88, 166, 255, 0.14);
+    color: var(--accent);
+}
+.admin-area-icon {
+    display: inline-block;
+    width: 12px;
+    text-align: center;
+    color: var(--text-muted);
+}
+.admin-area-btn-active .admin-area-icon,
+.admin-area-btn:hover .admin-area-icon {
+    color: var(--accent);
+}
+.admin-placeholder {
+    padding: 24px 16px;
+    color: var(--text-muted);
+    font-style: italic;
+}
+.role-detail-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+.role-detail-tab {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+}
+.role-detail-tab:hover {
+    color: var(--text);
+}
+.role-detail-tab-active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+/* Sub-strip inside the Privileges tab — "Grants" vs "Show affected
+   objects". Visually subdued vs the outer role-detail-tabs (smaller
+   font, no border-bottom on the strip itself) so the hierarchy reads
+   clearly: outer tabs are the structure, sub-strip is a sibling
+   choice within Privileges. */
+.role-privs-subtabs {
+    display: flex;
+    gap: 4px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    flex-shrink: 0;
+}
+.role-privs-subtab {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.role-privs-subtab:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+.role-privs-subtab-active {
+    color: var(--text);
+    background: rgba(31, 111, 235, 0.10);
+    border-color: var(--accent);
+}
+.explorer-shell .role-privs-subtabs {
+    background: var(--ex-panel);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .role-privs-subtab {
+    color: var(--ex-muted);
+    border-color: var(--ex-border);
+}
+.explorer-shell .role-privs-subtab:hover {
+    color: var(--ex-text);
+    border-color: var(--ex-accent);
+}
+.explorer-shell .role-privs-subtab-active {
+    color: var(--ex-text);
+    background: rgba(31, 111, 235, 0.08);
+    border-color: var(--ex-accent);
+}
+/* Object-kind filter chips above the Grants table. Visually a
+   sibling of the sub-tab strip but smaller and less assertive —
+   chips are an in-context filter, not navigation. Active state
+   uses the same blue-tint pattern as the sub-tab so the two
+   read consistently; inactive chips strike through to make the
+   exclusion legible at a glance. */
+.role-privs-kind-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    flex-shrink: 0;
+}
+.role-privs-kind-chip {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+    text-decoration: line-through;
+    text-decoration-color: var(--text-muted);
+}
+.role-privs-kind-chip:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+.role-privs-kind-chip-active {
+    color: var(--text);
+    background: rgba(31, 111, 235, 0.10);
+    border-color: var(--accent);
+    text-decoration: none;
+}
+.explorer-shell .role-privs-kind-strip {
+    background: var(--ex-panel);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .role-privs-kind-chip {
+    color: var(--ex-muted);
+    border-color: var(--ex-border);
+    text-decoration-color: var(--ex-muted);
+}
+.explorer-shell .role-privs-kind-chip:hover {
+    color: var(--ex-text);
+    border-color: var(--ex-accent);
+}
+.explorer-shell .role-privs-kind-chip-active {
+    color: var(--ex-text);
+    background: rgba(31, 111, 235, 0.08);
+    border-color: var(--ex-accent);
+}
+/* Checkbox column on the Grants table — narrow, centered, no
+   bottom border so the checkboxes form a clean column down the
+   left side. */
+.role-privs-list th.role-privs-check-cell,
+.role-privs-list td.role-privs-check-cell {
+    width: 1%;
+    padding-left: 12px;
+    padding-right: 4px;
+    text-align: center;
+    cursor: default;
+}
+/* Privileges grid is naturally wide (long GRANT statements on
+   MySQL, multi-column matrices on PG), so the table needs to
+   exceed the inspector and produce a horizontal scrollbar via
+   the wrapper's `overflow: auto`. The shared `.explorer-list`
+   rules cap cells at 320px with ellipsis truncation and force
+   the table to width:100% — both fight horizontal scroll, so
+   override here with two-class specificity that wins source-
+   order ties. */
+.explorer-list.role-privs-list {
+    width: max-content;
+    min-width: 100%;
+}
+.explorer-list.role-privs-list tbody td {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    overflow: visible;
+    text-overflow: clip;
+    max-width: none;
+}
+.role-super-banner {
+    padding: 8px 14px;
+    background: rgba(255, 165, 0, 0.12);
+    border-left: 3px solid #ff9500;
+    color: var(--text);
+    font-size: 11px;
+    font-family: var(--font-ui);
+    line-height: 1.5;
+}
+
+/* ── Object → Privileges matrix tab ──────────────────────────────── */
+/* Container scrolls horizontally for the wide matrix, vertically
+   for the row list. Same overscroll-behavior protection as the rest
+   of the explorer (set globally on body). */
+.privileges-scroll {
+    flex: 1;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+.privileges-toolbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    font-family: var(--font-ui);
+    font-size: 11px;
+}
+.privileges-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    user-select: none;
+    color: var(--text-muted);
+}
+.privileges-filter {
+    flex: 0 1 220px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 3px;
+}
+.privileges-filter:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+/* Matrix wrapper handles horizontal scroll. The grid itself sets
+   `width: max-content` so it grows to fit the column count, with a
+   floor of 100% so narrow content fills the panel. */
+.privileges-grid-wrap {
+    flex: 1;
+    overflow: auto;
+    padding-bottom: 24px;
+}
+.privileges-grid {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.privileges-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--panel-bg);
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+/* Sticky leftmost column so the grantee name stays visible while
+   horizontally scrolling through the privilege columns. */
+.privileges-grid thead th.privileges-th-grantee,
+.privileges-grid tbody td.privileges-td-grantee {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--panel-bg);
+    text-align: left;
+    padding-left: 14px;
+    padding-right: 14px;
+    border-right: 1px solid var(--border);
+}
+.privileges-grid thead th.privileges-th-grantee {
+    z-index: 3;  /* above body sticky col + above other thead */
+}
+.privileges-grid tbody td.privileges-td-grantee {
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+    max-width: 280px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.privileges-grid tbody td {
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    white-space: nowrap;
+}
+.privileges-td-cell {
+    font-size: 13px;
+    line-height: 1;
+    cursor: default;
+    transition: background-color 150ms;
+}
+/* Clickable cell — pointer cursor + subtle hover tint so the user
+   sees which cells respond to click. Owner / superuser / inherited
+   cells are explicitly not given this class, even though they have
+   `title` attributes — the cursor: default makes "this is read-
+   only" legible at a glance. */
+.privileges-clickable {
+    cursor: pointer;
+}
+.privileges-clickable:hover {
+    background-color: rgba(31, 111, 235, 0.10);
+}
+.privileges-cell-saving {
+    opacity: 0.55;
+    cursor: progress;
+}
+.privileges-cell-flash-saved {
+    background-color: rgba(22, 163, 74, 0.20);
+}
+.privileges-cell-flash-failed {
+    background-color: rgba(220, 38, 38, 0.20);
+}
+.explorer-shell .privileges-clickable:hover {
+    background-color: rgba(31, 111, 235, 0.08);
+}
+
+/* Revoke confirmation banner — visually parallel to the Data-tab
+   Delete-row banner so the user recognizes the pattern. Lives
+   inside `.privileges-grid-wrap` above the table. */
+.privileges-revoke-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    margin-bottom: 6px;
+    background-color: rgba(220, 38, 38, 0.10);
+    border: 1px solid rgba(220, 38, 38, 0.30);
+    border-radius: 4px;
+    color: var(--text);
+}
+.privileges-revoke-banner-text {
+    flex: 1;
+    font-size: 12px;
+}
+.privileges-revoke-banner-error {
+    color: #b91c1c;
+    font-size: 11px;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.explorer-shell .privileges-revoke-banner {
+    background-color: rgba(220, 38, 38, 0.12);
+    border-color: rgba(220, 38, 38, 0.40);
+    color: var(--ex-text);
+}
+.explorer-shell .privileges-revoke-banner-error {
+    /* Light red for dark-theme contrast — #b91c1c is too dim on
+       the near-black panel background. */
+    color: #f87171;
+}
+/* Direct grant — solid filled circle in the accent color. */
+.privileges-cell-direct { color: var(--accent); }
+/* Inherited grant — hollow circle in muted text. The hover tooltip
+   carries the chain via the `title` attr on the cell. */
+.privileges-cell-inherited { color: var(--text-muted); }
+.privileges-cell-empty { color: transparent; }
+/* Owner — same accent as direct (ownership is a stronger flavor of
+   direct grant) but with a subtler row tint, set via row class. */
+.privileges-cell-owner { color: var(--accent); }
+/* Superuser bypass — five-pointed star in a warm accent so the eye
+   catches it instantly as the "this role overrides everything" cue. */
+.privileges-cell-super {
+    color: #d97706;
+    font-size: 14px;
+}
+
+/* Row-label structure — name + parenthesized section suffix. The
+   suffix is rendered in muted text so the role name stays the
+   primary anchor for the eye. */
+.privileges-grantee-name { font-weight: 500; }
+.privileges-grantee-suffix {
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-left: 6px;
+    font-weight: 400;
+}
+
+/* Section row tints — subtle wash so section transitions are
+   visible without explicit dividers. The sticky leftmost grantee
+   cell has its own `background: var(--panel-bg)` rule with two-
+   class specificity (.privileges-grid tbody td.privileges-td-
+   grantee), so the row tints must match that specificity to
+   override — otherwise the tint stripe breaks at the first
+   column. Use `.privileges-grid tr.privileges-row-X td` for the
+   row-level tint. */
+.privileges-grid tr.privileges-row-owner td     { background: rgba(31, 111, 235, 0.08); }
+.privileges-grid tr.privileges-row-superuser td { background: rgba(217, 119, 6, 0.06); }
+.privileges-grid tr.privileges-row-none td      { color: var(--text-dim); }
+.privileges-grid tr.privileges-row-none .privileges-grantee-name { font-weight: 400; }
+
+.explorer-shell .privileges-cell-owner    { color: var(--ex-accent); }
+.explorer-shell .privileges-cell-super    { color: #b45309; }
+.explorer-shell .privileges-grantee-suffix { color: var(--ex-muted); }
+.explorer-shell .privileges-grid tr.privileges-row-owner td     { background: rgba(31, 111, 235, 0.07); }
+.explorer-shell .privileges-grid tr.privileges-row-superuser td { background: rgba(180, 83, 9, 0.06); }
+.explorer-shell .privileges-grid tr.privileges-row-none td      { color: var(--ex-dim); }
+
+/* Explorer-shell scoped overrides so the cream theme picks up
+   theme-appropriate colors. */
+.explorer-shell .privileges-toolbar {
+    background: var(--ex-panel);
+    border-bottom-color: var(--ex-border);
+    color: var(--ex-muted);
+}
+.explorer-shell .privileges-toggle { color: var(--ex-muted); }
+.explorer-shell .privileges-filter {
+    color: var(--ex-text);
+    border-color: var(--ex-border);
+}
+.explorer-shell .privileges-filter:focus { border-color: var(--ex-accent); }
+.explorer-shell .privileges-grid thead th {
+    background: var(--ex-panel);
+    color: var(--ex-muted);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .privileges-grid thead th.privileges-th-grantee,
+.explorer-shell .privileges-grid tbody td.privileges-td-grantee {
+    background: var(--ex-bg);
+    border-right-color: var(--ex-border);
+}
+.explorer-shell .privileges-grid tbody td.privileges-td-grantee { color: var(--ex-text); }
+.explorer-shell .privileges-grid tbody td { border-bottom-color: var(--ex-border); }
+.explorer-shell .privileges-cell-direct { color: var(--ex-accent); }
+.explorer-shell .privileges-cell-inherited { color: var(--ex-muted); }
+
+/* ── ERD tab (per-table) ────────────────────────────────────────────────── */
+/* HTML cards layered over an SVG edge canvas. Layout follows
+   vault/Architecture/ERD_PANEL_SPEC.md (with Tyto's existing palette in
+   place of the spec's warm-tinted one). Geometry constants live in
+   tyto/src/explorer.rs — keep CSS aligned if those numbers move. */
+.erd-tab-root {
+    /* Outer wrapper for the ERD tab — the toolbar sits absolute-positioned
+       on top of this so it stays visible regardless of canvas scroll. */
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.erd-scroll {
+    flex: 1;
+    overflow: auto;
+    background: var(--main-bg);
+}
+.erd-zoom-wrap {
+    /* Sized to scaled canvas dims (stage * zoom) so scroll bars track the
+       visual extent. The stage inside is at unscaled dims with transform:
+       scale(z) doing the visual zoom. */
+    position: relative;
+}
+
+/* ── Zoom toolbar ────────────────────────────────────────────────────────── */
+.erd-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 18px;
+    z-index: 10;
+    display: inline-flex;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    /* Slight shadow so the toolbar lifts off the canvas without needing a
+       full opaque background — works in both light backgrounds and dark. */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+.erd-zoom-btn {
+    background: transparent;
+    color: var(--text);
+    border: 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 4px 10px;
+    cursor: pointer;
+    line-height: 1;
+    min-width: 28px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.erd-zoom-btn:hover {
+    background: var(--main-bg);
+    color: var(--accent);
+}
+.erd-zoom-btn + .erd-zoom-btn {
+    border-left: 1px solid var(--border);
+}
+.erd-zoom-pct {
+    font-size: 11px;
+    color: var(--text-muted);
+    min-width: 48px;
+}
+.erd-zoom-pct:hover {
+    color: var(--accent);
+}
+/* Magnifier-glass zoom icons. Sized in `em` so they scale with any
+   future font-size adjustment; stroke uses `currentColor` so they
+   pick up the button's text color (including the hover/active
+   accent without a separate selector). */
+.erd-zoom-icon {
+    width: 1.1em;
+    height: 1.1em;
+    display: block;
+}
+
+/* Generations dropdown sits in the same toolbar as zoom; small vertical
+   divider separates the two control groups. */
+.erd-gen-select {
+    background: transparent;
+    color: var(--text);
+    border: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 4px 22px 4px 10px;
+    cursor: pointer;
+    line-height: 1;
+    height: 26px;
+    /* Native select arrow is heavy on dark surfaces; replace with a small
+       chevron drawn into the background. */
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+                      linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+    background-position: calc(100% - 11px) center, calc(100% - 7px) center;
+    background-size: 4px 4px, 4px 4px;
+    background-repeat: no-repeat;
+}
+.erd-gen-select:hover { color: var(--accent); }
+.erd-gen-select:focus { outline: none; color: var(--accent); }
+.erd-toolbar-divider {
+    width: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+/* Keys-only checkbox sits to the LEFT of the generations dropdown. The
+   wrapper is the click target so the label and the box together flip the
+   value. Compact — the toolbar is space-constrained. */
+.erd-keys-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    user-select: none;
+}
+.erd-keys-toggle:hover { color: var(--accent); }
+.erd-keys-toggle input[type="checkbox"] {
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    accent-color: var(--accent);
+    margin: 0;
+}
+.erd-edges-svg {
+    /* Edges underneath cards. SVG is non-interactive so card hovers and
+       clicks pass through cleanly. */
+    pointer-events: none;
+}
+
+/* ── Card ────────────────────────────────────────────────────────────────── */
+.erd-card {
+    background: var(--panel-bg);
+    border: 1px solid var(--text-muted);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--text);
+    overflow: hidden;
+    user-select: none;
+    box-sizing: border-box;
+}
+/* "+N more" pill — sits at the bottom of a capped band. Dashed border
+   signals "incomplete list"; positioned absolutely by inline styles
+   from the renderer so it x-aligns with the band's cards. */
+.erd-overflow-pill {
+    position: absolute;
+    background: var(--panel-bg);
+    border: 1px dashed var(--text-muted);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 6px 0;
+    cursor: pointer;
+    box-sizing: border-box;
+    user-select: none;
+    transition: background 120ms ease-out, color 120ms ease-out;
+}
+.erd-overflow-pill:hover {
+    background: rgba(88, 166, 255, 0.08);
+    color: var(--text);
+    border-color: var(--text);
+}
+/* Popover anchored beneath an overflow pill — fixed-position so it
+   floats above the ERD canvas's transformed/scaled stage. Lists each
+   hidden table with the schema-qualified name + FK column count. */
+.erd-overflow-popover-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: transparent;
+}
+.erd-overflow-popover {
+    position: fixed;
+    z-index: 1101;
+    min-width: 240px;
+    max-height: 60vh;
+    overflow-y: auto;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text);
+    user-select: none;
+}
+.erd-overflow-popover-header {
+    padding: 6px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.erd-overflow-popover-row {
+    padding: 6px 14px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+}
+.erd-overflow-popover-row:hover {
+    background: var(--accent);
+    color: #fff;
+}
+.erd-overflow-popover-name {
+    font-family: var(--font-mono);
+}
+.erd-overflow-popover-meta {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+.erd-overflow-popover-row:hover .erd-overflow-popover-meta {
+    color: rgba(255,255,255,0.85);
+}
+.erd-card-target {
+    border: 1.5px solid var(--accent);
+}
+.erd-card-name {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    display: flex;
+    align-items: baseline;
+    /* Smooth color flicker on hover when clickable. */
+    transition: background 120ms ease-out;
+}
+.erd-card-name-clickable {
+    cursor: pointer;
+}
+.erd-card-name-clickable:hover {
+    /* Subtle wash that says "this is interactive" without competing with
+       the focus-mode highlight system. */
+    background: rgba(88, 166, 255, 0.08);
+}
+.erd-schema-prefix {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+.erd-table-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.erd-card-cols {
+    padding: 4px 0 6px;
+}
+.erd-col {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 14px;
+    height: 22px;
+    line-height: 22px;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+.erd-col-relevant {
+    /* Subtle tint on rows that participate in any edge. Phase 4 ships
+       cards-from-edges only, so every shown row is "relevant"; Phase 4.5
+       (all-columns rendering) will drop this class on non-edge rows. */
+    background: rgba(255, 255, 255, 0.03);
+}
+.erd-col-name {
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+}
+.erd-col-anno {
+    font-size: 10.5px;
+    margin-left: 12px;
+}
+.erd-tag-pk   { color: var(--accent); }
+.erd-tag-fk   { color: var(--text-muted); }
+.erd-tag-pkfk { color: var(--accent); }
+
+/* Partition list inside the focal card. Smaller font + indent so it reads
+   as a sub-element of the table card, not a peer of the column rows. */
+.erd-partitions {
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+.erd-partitions-label {
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--text-muted);
+    padding: 0 14px;
+    height: 18px;
+    line-height: 18px;
+}
+.erd-partition {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    padding: 0 14px 0 22px;  /* extra left padding for indent */
+    height: 18px;
+    line-height: 18px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.erd-partition-clickable {
+    cursor: pointer;
+    transition: background 120ms ease-out;
+}
+.erd-partition-clickable:hover {
+    background: rgba(88, 166, 255, 0.08);
+    color: var(--accent);
+}
+.erd-partition-overflow {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* Empty-state hint under the focal card when the table has no FK
+   relationships at all. Quiet text so the focal card stays the visual
+   anchor; no border / box, just a centred caption. */
+.erd-empty-hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    font-style: italic;
+}
+
+/* ── Focus mode (hover-driven dimming) ──────────────────────────────────── */
+/* Hover a card → cards/edges not connected to it fade. Transition keeps the
+   change subtle instead of snappy — feels like the canvas leans toward the
+   hovered context rather than blinking unrelated content out. */
+.erd-card     { transition: opacity 160ms ease-out; }
+.erd-card.erd-dimmed { opacity: 0.22; }
+
+.erd-edge,
+.erd-edge-marker      { transition: opacity 160ms ease-out; }
+.erd-edge-dimmed .erd-edge,
+.erd-edge-dimmed .erd-edge-marker        { opacity: 0.12; }
+.erd-edge-dimmed .erd-edge-target,
+.erd-edge-dimmed .erd-edge-marker-target { opacity: 0.12; }
+
+/* ── Edges ───────────────────────────────────────────────────────────────── */
+.erd-edge {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    fill: none;
+    opacity: 0.55;
+}
+.erd-edge-target {
+    /* Brighter and thicker so target-touching edges read first. */
+    stroke: var(--accent);
+    stroke-width: 1.25;
+    opacity: 0.85;
+}
+.erd-edge-marker {
+    stroke: var(--text-muted);
+    stroke-width: 1;
+    stroke-linecap: round;
+    fill: none;
+    opacity: 0.55;
+}
+.erd-edge-marker-target {
+    stroke: var(--accent);
+    stroke-width: 1.25;
+    opacity: 0.85;
+}
+
+/* ── New-connection form: DbType segmented selector ─────────────────── */
+.dbtype-seg {
+    display: inline-flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--main-bg);
+}
+.dbtype-seg-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.dbtype-seg-btn:hover { color: var(--text); background: var(--panel-bg); }
+.dbtype-seg-active {
+    background: var(--accent) !important;
+    color: #fff !important;
+}
+
+/* ── Connection list DB-type badge (MY / PG) ────────────────────────── */
+.conn-db-badge {
+    display: inline-block;
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    line-height: 1.4;
+    flex-shrink: 0;
+    text-transform: uppercase;
+}
+.conn-db-badge-my { background: rgba(88, 166, 255, 0.18); color: #58a6ff; }
+.conn-db-badge-pg { background: rgba(63, 185, 80, 0.18);  color: #3fb950; }
+.conn-item.active .conn-db-badge { background: rgba(255,255,255,0.22); color: #fff; }
+
+/* ── Schema Explorer (app-style layout) ─────────────────────────────────────── */
+
+.explorer-shell {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    background: var(--main-bg);
+    min-width: 0;
+    min-height: 0;
+}
+
+.explorer-close-btn {
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+}
+.explorer-close-btn:hover { color: var(--red); }
+
+/* Top control bar — schema dropdown + search + checkbox + refresh */
+.explorer-controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-bg);
+    flex-shrink: 0;
+}
+
+.explorer-control-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.explorer-search-group { flex: 1; min-width: 0; }
+
+.explorer-control-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.explorer-select {
+    background: var(--main-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 5px 28px 5px 10px;
+    border-radius: 4px;
+    min-width: 180px;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%238b949e' d='M0 0l5 6 5-6z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+}
+.explorer-select:hover:not(:disabled) { border-color: var(--accent); }
+.explorer-select:focus { outline: none; border-color: var(--accent); }
+.explorer-select:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.explorer-search-input {
+    flex: 1;
+    width: 100%;
+    background: var(--main-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+.explorer-search-input::placeholder { color: var(--text-dim); }
+.explorer-search-input:focus { outline: none; border-color: var(--accent); }
+
+.explorer-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+.explorer-checkbox input { accent-color: var(--accent); cursor: pointer; }
+
+/* Object-type segmented strip */
+.explorer-typebar {
+    display: flex;
+    gap: 0;
+    padding: 0 12px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+.explorer-type-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 500;
+    padding: 9px 14px 8px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: color 0.1s;
+}
+.explorer-type-btn:hover { color: var(--text); }
+.explorer-type-active {
+    color: var(--accent) !important;
+    border-bottom-color: var(--accent) !important;
+}
+.explorer-type-icon { font-size: 14px; line-height: 1; }
+.explorer-type-label { letter-spacing: 0.2px; }
+
+/* List + inspector body (column flex; list scrolls, inspector pinned bottom) */
+.explorer-body {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+
+.explorer-list-wrap {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    min-height: 0;
+}
+.explorer-list-scroll {
+    flex: 1;
+    overflow: auto;
+    padding-bottom: 24px;
+}
+
+/* Flat list table */
+.explorer-list {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.explorer-list thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    text-align: left;
+    padding: 9px 14px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-family: var(--font-ui);
+}
+/* Sortable headers get a hover accent + pointer cursor so the DBA
+   knows the label is clickable. Mirrors the Data-tab column-header
+   sort (which uses .data-sort-arrow for the ↑/↓ glyph and is
+   reused verbatim on the outer object list). */
+.ex-th-sortable {
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.1s;
+}
+.ex-th-sortable:hover {
+    color: var(--accent);
+}
+.explorer-list tbody td {
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 320px;
+}
+.explorer-list tbody tr { cursor: pointer; }
+.explorer-list tbody tr:hover td { background: var(--panel-bg); }
+.explorer-list-row-active td {
+    background: rgba(88,166,255,0.10) !important;
+    color: var(--text);
+}
+.explorer-list-row-active .ex-td-name {
+    color: var(--accent) !important;
+}
+
+.ex-th-schema, .ex-td-schema { color: var(--text-muted); width: 1%; }
+.ex-th-name { width: 240px; }
+.ex-td-name { color: var(--text); font-weight: 500; }
+.ex-td-extra { color: var(--text-muted); font-size: 11px; }
+.ex-th-hidden, .ex-td-hidden { display: none; }
+
+/* Partition child rows in the outer table list: indented under their
+   parent. Muted text so the row reads as "secondary" to the parent.
+   The `.explorer-list ` prefix bumps specificity (0,2,0) above the
+   `.explorer-list tbody td { padding: 7px 14px }` shorthand (0,1,2),
+   otherwise the shorthand wipes our `padding-left` and children render
+   flush with the parent. */
+.explorer-list .ex-td-name-partition {
+    padding-left: 28px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* "(N partitions)" suffix on a partitioned parent row's name. Always
+   shown when has_children > 0; doubles as the click hotspot for toggling
+   expansion (left-click) AND the anchor for the right-click context menu.
+   The project avoids dedicated expansion widgets — the count IS the
+   affordance. Hover styling signals clickability without a chevron. */
+.ex-row-partition-count {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-weight: 400;
+    margin-left: 6px;
+}
+.ex-row-partition-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+.ex-row-partition-toggle:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+.explorer-msg {
+    padding: 24px;
+    text-align: center;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 12px;
+}
+
+/* Inspector (bottom inline detail panel) */
+.explorer-inspector {
+    border-top: 1px solid var(--border);
+    background: var(--main-bg);
+    display: flex;
+    flex-direction: column;
+    /* Default leans toward "give the list more real estate by default";
+       the ⤢ expand button still grows the inspector to full height when
+       a richer view (table Schema + Columns + Indexes + DDL) needs it. */
+    height: 300px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.explorer-inspector-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.explorer-inspector-title {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.explorer-inspector-expand {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: auto;
+}
+.explorer-inspector-expand:hover { color: var(--accent); }
+.explorer-inspector-close {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+.explorer-inspector-close:hover { color: var(--red); background: var(--main-bg); }
+
+/* ── Combined Schema tab (overview + columns + indexes) ─────────────────── */
+
+.schema-scroll {
+    flex: 1;
+    overflow: auto;
+    padding: 0 0 24px 0;
+}
+
+/* Section dividers and labels */
+.schema-section-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 16px 0;
+}
+.schema-section-header {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    padding: 10px 16px 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+/* Section-header trailing controls (e.g. the Relationships row's expand
+   icon) get padded clear of the right edge so they don't kiss the panel
+   border. `.explorer-inspector-expand` already adds `margin-left: auto`
+   which floats the button right inside the flex row. */
+.schema-section-header .explorer-inspector-expand {
+    margin-right: 16px;
+}
+
+/* Activity pane's section headers (Sessions / Locks / Blocking) are
+   click-to-toggle. Cursor + user-select telegraph the affordance; a
+   subtle hover background reinforces it. No caret widget — the
+   presence/absence of section content is the visual state indicator. */
+.activity-section-toggle {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.1s ease;
+}
+.activity-section-toggle:hover {
+    background-color: var(--hover-bg, rgba(255, 255, 255, 0.04));
+}
+
+/* ── Object header (overview block) ── */
+/* Horizontal padding lives on `.object-meta-grid` so the grid brings
+   its own margins wherever it renders (header + Storage tab both). */
+.object-header {
+    padding: 14px 0 6px;
+}
+.object-meta-grid {
+    display: grid;
+    /* 240px min gives a Last analyze cell room for the full
+       `YYYY-MM-DD HH:MM` timestamp (~130px in monospace) plus its
+       ~90px `LAST ANALYZE` label — 200px was too tight and the
+       timestamp ellipsized. */
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 4px 24px;
+    /* 16px horizontal so cells don't kiss the panel edge on either
+       side — matches `.schema-section-header` and `.object-header`'s
+       former horizontal padding. Rightmost cell's value (e.g. Avg
+       row's "84 B") used to run off the visible page on the Storage
+       tab because the grid sat directly against the scroll container. */
+    padding: 0 16px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.object-meta-cell {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 2px 0;
+}
+.object-meta-key {
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-family: var(--font-ui);
+    white-space: nowrap;
+}
+.object-meta-val {
+    color: var(--text);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+/* Severity classes for DBA-actionable metrics in the Overview grid
+   (storage factor today; reusable). Bold + colored text — same amber
+   and red as the txn-badge palette for visual consistency; the green
+   reads on both light and dark themes. Hover surfaces the cell's
+   `title=` attribute with the breakdown. */
+.object-meta-val.metric-good  { color: #6a9955; font-weight: 600; }
+.object-meta-val.metric-watch { color: #c9a233; font-weight: 600; }
+.object-meta-val.metric-bad   { color: #b03c3c; font-weight: 600; }
+.object-comment {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border);
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+}
+.object-comment-text {
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    flex: 1;
+}
+
+/* ── Schema tables (columns list + indexes list) ── */
+.schema-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    margin: 0;
+}
+.schema-table th {
+    text-align: left;
+    padding: 6px 12px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text-muted);
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+    font-family: var(--font-ui);
+    vertical-align: bottom;
+    line-height: 1.2;
+}
+.schema-table td {
+    padding: 4px 12px;
+    border: none;          /* no row separators — user rule */
+    white-space: nowrap;
+    color: var(--text);
+    vertical-align: baseline;
+}
+.schema-table tr:hover td { background: rgba(88,166,255,0.05); }
+/* Keyboard cursor on a Schema-tab columns-list row. Same yellow-cream
+   + blue-text aesthetic as the outer object list, applied per row.
+   Click on a column row also sets it (mouse + keyboard share state). */
+.schema-cols-table .schema-col-row { cursor: pointer; }
+.schema-cols-table .schema-col-row-active td {
+    background: rgba(88,166,255,0.10) !important;
+    color: var(--text);
+}
+.schema-cols-table .schema-col-row-active .schema-col-name {
+    color: var(--accent) !important;
+}
+
+.schema-th-ord    { width: 64px; text-align: right !important; }
+.schema-th-name   { width: 240px; }
+.schema-th-itag   { width: 40px; }
+.schema-th-unique { width: 60px; text-align: center !important; }
+
+.schema-td-ord    { text-align: right; color: var(--text-dim); }
+.schema-td-name   { color: var(--text); }
+.schema-col-name  { color: var(--text); font-weight: 500; }
+.schema-td-type   { color: var(--accent); }
+.schema-td-size   { color: var(--text-muted); }
+.schema-td-null   { color: var(--text-muted); font-size: 11px; }
+.schema-td-default{ color: var(--text-muted); }
+.schema-td-extra  { color: var(--text-dim); font-size: 11px; }
+.schema-td-unique { text-align: center; color: var(--green); font-weight: 700; }
+.schema-td-itag   { text-align: right; padding-right: 4px !important; }
+
+/* Index superscript tags on column names */
+.schema-col-tag {
+    display: inline-block;
+    font-size: 9px;
+    color: var(--accent);
+    margin-left: 3px;
+    vertical-align: super;
+    line-height: 1;
+    font-family: var(--font-mono);
+    font-weight: 600;
+}
+.schema-col-tag-pk { color: var(--yellow); }
+.schema-index-table .schema-col-tag { vertical-align: baseline; font-size: 11px; }
+
+.app-header-btn-active { color: var(--accent) !important; }
+
+/* ── Schema Explorer: scoped "warm paper" theme ─────────────────────────────
+ *
+ * The shell uses a dark terminal palette. The schema explorer is a different
+ * KIND of surface — a structured GUI tool — and the user wants it to feel
+ * visually distinct. We scope every override under `.explorer-shell` so the
+ * dark rules above still apply everywhere else (shell history, workspace
+ * chrome, sidebar).
+ *
+ * Palette: cream bg + charcoal text, burnt-orange PK tags, deep-blue index
+ * tags, and selected-row highlight in a pale yellow to feel like a
+ * highlighter on paper.
+ */
+
+.explorer-shell {
+    --ex-bg:        #faf6ee;
+    --ex-panel:     #f3eed9;
+    --ex-panel-alt: #ece5cc;
+    --ex-border:    #d9d2ba;
+    --ex-text:      #2b2d33;
+    --ex-muted:     #6b6f78;
+    --ex-dim:       #9aa0a9;
+    --ex-accent:    #1f6feb;
+    --ex-hover:     #f0e9cf;
+    --ex-selected:  #fff3c4;
+    --ex-selected-text: #1f6feb;
+    --ex-pk:        #b45309;   /* burnt orange for (pk) */
+    --ex-idx:       #1f6feb;   /* deep blue for (a), (b1), (b2) */
+    --ex-red:       #b91c1c;
+    --ex-green:     #15803d;
+
+    background: var(--ex-bg) !important;
+    color: var(--ex-text);
+}
+
+/* ── Pane toolbar ─────────────────────────────────────────────────────── */
+.explorer-shell .shell-toolbar {
+    background: var(--ex-panel);
+    border-bottom: 1px solid var(--ex-border);
+    color: var(--ex-text);
+}
+.explorer-shell .shell-conn-name { color: var(--ex-text); }
+.explorer-shell .shell-toolbar-plane {
+    color: var(--ex-muted);
+    border-color: var(--ex-border);
+    background: var(--ex-bg);
+}
+.explorer-shell .tab-action-btn {
+    color: var(--ex-muted);
+}
+.explorer-shell .tab-action-btn:hover {
+    color: var(--ex-text);
+    background: var(--ex-hover);
+}
+.explorer-shell .explorer-close-btn:hover { color: var(--ex-red); }
+
+/* ── Top control bar (schema dropdown · search · all-schemas · refresh) */
+.explorer-shell .explorer-controls {
+    background: var(--ex-panel);
+    border-bottom: 1px solid var(--ex-border);
+}
+.explorer-shell .explorer-control-label { color: var(--ex-muted); }
+.explorer-shell .explorer-select {
+    /* Use longhand background-color so background-repeat / background-position
+     * from the base rule aren't reset back to defaults (which would tile the
+     * caret SVG across the whole element). */
+    background-color: var(--ex-bg);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%236b6f78' d='M0 0l5 6 5-6z'/></svg>");
+    border-color: var(--ex-border);
+    color: var(--ex-text);
+}
+.explorer-shell .explorer-select:hover:not(:disabled) { border-color: var(--ex-accent); }
+.explorer-shell .explorer-select:focus { border-color: var(--ex-accent); }
+.explorer-shell .explorer-search-input {
+    background: var(--ex-bg);
+    border-color: var(--ex-border);
+    color: var(--ex-text);
+}
+.explorer-shell .explorer-search-input::placeholder { color: var(--ex-dim); }
+.explorer-shell .explorer-search-input:focus { border-color: var(--ex-accent); }
+.explorer-shell .explorer-checkbox { color: var(--ex-muted); }
+.explorer-shell .explorer-checkbox input { accent-color: var(--ex-accent); }
+.explorer-shell .explorer-refresh-btn { color: var(--ex-muted); }
+.explorer-shell .explorer-refresh-btn:hover {
+    color: var(--ex-text);
+    background: var(--ex-hover);
+}
+
+/* ── Object-type segmented strip ──────────────────────────────────────── */
+.explorer-shell .explorer-typebar {
+    background: var(--ex-panel);
+    border-bottom: 1px solid var(--ex-border);
+}
+.explorer-shell .explorer-type-btn { color: var(--ex-muted); }
+.explorer-shell .explorer-type-btn:hover { color: var(--ex-text); }
+.explorer-shell .explorer-type-active {
+    color: var(--ex-accent) !important;
+    border-bottom-color: var(--ex-accent) !important;
+}
+
+/* ── Flat object list ─────────────────────────────────────────────────── */
+.explorer-shell .explorer-list thead th {
+    background: var(--ex-panel);
+    color: var(--ex-muted);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .explorer-list tbody td {
+    color: var(--ex-text);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .explorer-list tbody tr:hover td { background: var(--ex-hover); }
+.explorer-shell .explorer-list-row-active td {
+    background: var(--ex-selected) !important;
+    color: var(--ex-text);
+}
+.explorer-shell .explorer-list-row-active .ex-td-name {
+    color: var(--ex-selected-text) !important;
+}
+.explorer-shell .ex-td-schema { color: var(--ex-muted); }
+.explorer-shell .ex-td-name   { color: var(--ex-text); }
+/* Partition child rows in the shell-pane explorer — same intent as the
+   default `.ex-td-name-partition` rule (muted-vs-text contrast on the
+   parent above) but using the shell's themed colour. Needed because the
+   `.explorer-shell .ex-td-name` rule's 0,2,0 specificity beats the bare
+   `.ex-td-name-partition` (0,1,0). */
+.explorer-shell .ex-td-name-partition { color: var(--ex-muted); }
+.explorer-shell .ex-td-extra  { color: var(--ex-muted); }
+
+.explorer-shell .explorer-msg   { color: var(--ex-dim); }
+.explorer-shell .explorer-error { color: var(--ex-red); }
+
+/* ── Inline inspector (bottom panel when an object is selected) ────────── */
+.explorer-shell .explorer-inspector {
+    background: var(--ex-bg);
+    border-top: 1px solid var(--ex-border);
+}
+.explorer-shell .explorer-inspector-header {
+    background: var(--ex-panel);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .explorer-inspector-title { color: var(--ex-text); }
+.explorer-shell .explorer-inspector-close { color: var(--ex-muted); }
+.explorer-shell .explorer-inspector-close:hover {
+    color: var(--ex-red);
+    background: var(--ex-bg);
+}
+
+/* ── Schema / DDL tab strip inside the inspector ───────────────────────── */
+.explorer-shell .detail-tabs {
+    background: var(--ex-panel);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .detail-tab-btn { color: var(--ex-muted); }
+.explorer-shell .detail-tab-btn:hover { color: var(--ex-text); }
+.explorer-shell .detail-tab-active {
+    color: var(--ex-accent) !important;
+    border-bottom-color: var(--ex-accent);
+}
+
+/* ── Schema tab body: overview grid + section headers + tables ─────────── */
+.explorer-shell .schema-section-divider { background: var(--ex-border); }
+.explorer-shell .schema-section-header  { color: var(--ex-muted); }
+
+.explorer-shell .object-meta-key   { color: var(--ex-muted); }
+.explorer-shell .object-meta-val   { color: var(--ex-text); }
+/* Severity overrides — scoped under `.explorer-shell` to win on
+   cascade-order specificity against the generic `.object-meta-val`
+   reset above. Without this, the metric colors are silently dead in
+   the only context the Overview grid renders. See CSS shorthand-vs-
+   longhand trap in .claude/rules/tyto.md for the matching CSS gotcha.
+   The second triple covers the per-index Storage column in the
+   Indexes tab (`.schema-td-size.metric-*`). */
+.explorer-shell .object-meta-val.metric-good,
+.explorer-shell .schema-td-size.metric-good   { color: #6a9955; font-weight: 600; }
+.explorer-shell .object-meta-val.metric-watch,
+.explorer-shell .schema-td-size.metric-watch  { color: #c9a233; font-weight: 600; }
+.explorer-shell .object-meta-val.metric-bad,
+.explorer-shell .schema-td-size.metric-bad    { color: #b03c3c; font-weight: 600; }
+.explorer-shell .object-comment    { border-top-color: var(--ex-border); }
+.explorer-shell .object-comment-text { color: var(--ex-text); }
+
+.explorer-shell .schema-table th {
+    color: var(--ex-muted);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .schema-table td { color: var(--ex-text); }
+.explorer-shell .schema-table tr:hover td { background: var(--ex-hover); }
+.explorer-shell .schema-cols-table .schema-col-row-active td {
+    background: var(--ex-selected) !important;
+    color: var(--ex-text);
+}
+.explorer-shell .schema-cols-table .schema-col-row-active .schema-col-name {
+    color: var(--ex-selected-text) !important;
+}
+
+.explorer-shell .schema-td-ord    { color: var(--ex-dim); }
+.explorer-shell .schema-td-name   { color: var(--ex-text); }
+.explorer-shell .schema-col-name  { color: var(--ex-text); }
+.explorer-shell .schema-td-type   { color: var(--ex-accent); }
+.explorer-shell .schema-td-size   { color: var(--ex-muted); }
+.explorer-shell .schema-td-null   { color: var(--ex-muted); }
+.explorer-shell .schema-td-default { color: var(--ex-muted); }
+.explorer-shell .schema-td-extra  { color: var(--ex-dim); }
+.explorer-shell .schema-td-unique { color: var(--ex-green); }
+
+/* Superscript index tags — pk=burnt orange, others=blue */
+.explorer-shell .schema-col-tag    { color: var(--ex-idx); }
+.explorer-shell .schema-col-tag-pk { color: var(--ex-pk); }
+
+/* ── Generic detail-table (used by the Overview two-column layout) ──── */
+.explorer-shell .detail-table th {
+    background: var(--ex-panel);
+    color: var(--ex-muted);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .detail-table td {
+    color: var(--ex-text);
+    border-bottom-color: var(--ex-border);
+}
+.explorer-shell .detail-table tr:hover td { background: var(--ex-hover); }
+.explorer-shell .detail-table-wrap { border-top-color: var(--ex-border); }
+.explorer-shell .overview-key { color: var(--ex-muted); }
+
+.explorer-shell .detail-msg   { color: var(--ex-dim); }
+.explorer-shell .detail-error { color: var(--ex-red); }
+
+/* ── DDL block: cream bg + charcoal mono text ─────────────────────────── */
+.explorer-shell .detail-ddl {
+    background: var(--ex-bg);
+    color: var(--ex-text);
+    border-top-color: var(--ex-border);
+}
+
+/* ── Pane-type dropdown menu (the ⊡ button popover) ──────────────────── */
+.pane-menu-trigger {
+    position: relative;
+    display: inline-flex;
+}
+.pane-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    z-index: 1000;
+    min-width: 180px;
+    background: var(--ex-panel, var(--panel-bg));
+    color: var(--ex-text, var(--text));
+    border: 1px solid var(--ex-border, var(--border));
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    padding: 4px 0;
+    font-family: var(--font-ui);
+    font-size: 12px;
+    user-select: none;
+}
+.pane-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 14px;
+    cursor: pointer;
+    color: var(--ex-text, var(--text));
+}
+.pane-menu-item:hover {
+    background: var(--ex-hover, rgba(255, 255, 255, 0.06));
+}
+.pane-menu-icon {
+    font-size: 14px;
+    width: 16px;
+    text-align: center;
+    color: var(--ex-accent, var(--accent));
+}
+.pane-menu-label {
+    flex: 1;
+}
+
+/* ── Activity pane — layout + tables ─────────────────────────────────── */
+.activity-shell .activity-control-bar {
+    gap: 16px;
+}
+.activity-last-updated {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--ex-muted, var(--text-muted));
+    margin-left: auto;
+    white-space: nowrap;
+}
+
+/* Session rows: red left-accent when blocked, yellow when blocker */
+.explorer-shell.activity-shell .activity-row td:first-child {
+    border-left: 3px solid transparent;
+}
+.explorer-shell.activity-shell .activity-row-blocked td:first-child {
+    border-left-color: var(--ex-red);
+}
+.explorer-shell.activity-shell .activity-row-blocker td:first-child {
+    border-left-color: var(--ex-pk);  /* burnt orange = "this one is holding things up" */
+}
+
+.explorer-shell.activity-shell .activity-blocked-by {
+    color: var(--ex-red);
+    font-family: var(--font-mono);
+}
+.explorer-shell.activity-shell .activity-query {
+    color: var(--ex-muted);
+    font-family: var(--font-mono);
+    max-width: 360px;
+    vertical-align: top;
+    cursor: pointer;
+}
+/* The inner <div> owns the collapse/expand — td stays a table cell so
+   the rest of the row's layout is unaffected when this cell grows.
+   Default: single-line truncated; click toggles .activity-query-expanded
+   which wraps. Right-click still opens the copy menu; expand state
+   persists across polling ticks so an expanded cell stays expanded when
+   the sessions list refreshes. */
+.explorer-shell.activity-shell .activity-query-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 360px;
+}
+.explorer-shell.activity-shell .activity-query-text.activity-query-expanded {
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow: visible;
+}
+
+/* Granted / not-granted badges in the locks table */
+.explorer-shell.activity-shell .activity-granted-yes {
+    color: var(--ex-green);
+    font-weight: 600;
+}
+.explorer-shell.activity-shell .activity-granted-no {
+    color: var(--ex-red);
+    font-weight: 600;
+}
+
+/* ── Kill button + confirm popover ───────────────────────────────────── */
+.activity-th-kill { width: 52px; }
+.explorer-shell.activity-shell .activity-td-kill {
+    width: 52px;
+    text-align: center;
+    padding: 0 !important;
+}
+.activity-kill {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    line-height: 20px;
+    text-align: center;
+    border-radius: 3px;
+    color: var(--ex-muted, var(--text-muted));
+    cursor: pointer;
+    font-size: 12px;
+    transition: color 0.1s, background 0.1s;
+}
+.activity-kill:hover {
+    color: var(--ex-red, var(--red));
+    background: var(--ex-hover, rgba(255, 255, 255, 0.06));
+}
+.activity-confirm {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-ui);
+}
+.activity-confirm-yes {
+    background: var(--ex-red, var(--red));
+    color: #fff;
+    padding: 2px 6px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+.activity-confirm-no {
+    color: var(--ex-muted, var(--text-muted));
+    cursor: pointer;
+    padding: 2px 4px;
+}
+.activity-confirm-no:hover {
+    color: var(--ex-text, var(--text));
+}
+
+/* ── Blocker tree ─────────────────────────────────────────────────────── */
+.explorer-shell.activity-shell .activity-blocker-tree {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 4px 14px;
+    color: var(--ex-text);
+}
+.activity-blocker-node {
+    padding-top: 2px;
+    padding-bottom: 2px;
+    white-space: nowrap;
+}
+.activity-blocker-stub {
+    color: var(--ex-dim);
+    font-style: italic;
+}
+.activity-blocker-cycle {
+    color: var(--ex-pk);  /* burnt orange — matches "(pk)" superscripts elsewhere */
+    font-weight: 600;
+}
+
+/* ── Delete connection button ─────────────────────────────────────────────── */
+.btn-delete-conn {
+    background: rgba(230, 70, 70, 0.12);
+    color: #e25555;
+    border: 1px solid rgba(230, 70, 70, 0.4);
+    border-radius: 4px;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-delete-conn:hover {
+    background: rgba(230, 70, 70, 0.25);
+}
+
+/* ── Connection form improvements ────────────────────────────────────────── */
+.form-db-type-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 6px 0;
+}
+.btn-test-conn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 14px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 12px;
+}
+.btn-test-conn:hover { background: rgba(255,255,255,0.06); }
+.test-status { font-size: 12px; margin-left: 8px; }
+.test-ok { color: #4caf50; }
+.test-fail { color: #e25555; }
+.test-pending { color: var(--text-muted); font-style: italic; }
+.btn-load-dbs {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-load-dbs:hover { color: var(--accent); }
+
+/* ── Connection header bar (once per workspace) ── */
+.conn-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 16px;
+    background: var(--panel-bg);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.conn-header-name {
+    color: var(--text);
+    font-weight: 600;
+}
+.conn-header-where {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+.conn-header-who {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+.pane-tab-spacer { flex: 1; }
+
+/* ── Table relationships row (Schema tab) ─────────────────────────────
+   Five equal vertical columns. Position implies role:
+   [Grand-parents] [Parents] [THIS] [Children] [Grand-children]
+   No headers, no arrows — DBA-readable on its own. */
+.rel-row {
+    display: grid;
+    /* `minmax(160px, 1fr)` reserves a real track width per column so PG
+       table names don't collapse to ellipsis-only slivers when the
+       inspector is narrow. If the inspector is narrower than the natural
+       5 × 160px row, the outer `.schema-scroll` provides a horizontal
+       scrollbar — preferable to the prior `1fr` behaviour that silently
+       truncated content to nothing. */
+    grid-template-columns: repeat(5, minmax(160px, 1fr));
+    gap: 16px;
+    align-items: start;
+    padding: 12px 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.rel-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    /* ~5 rows at 12px / line-height 1.4 / 1px padding / 6px row-gap.
+       Default cap; bands with ≤ 5 entries render shorter (no wasted
+       reservation), bands with more scroll inside the column. */
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.4;
+}
+/* Expanded variant: triggered by the Relationships section's expand
+   icon when any band has more than RELATIONSHIPS_OVERFLOW_THRESHOLD
+   entries. 75vh scales with the screen so many-relations tables
+   actually fit (≈35 rows on a 900px display, ≈55 on 1440px); the
+   outer `.schema-scroll` picks up any remainder. */
+.rel-col-expanded {
+    max-height: 75vh;
+}
+/* Every row in a `.rel-col` must declare `flex-shrink: 0` — without it
+   the flex container's default `flex-shrink: 1` compresses rows when
+   the column's total content height exceeds the cap, squashing 50 PG
+   table names into a 120px band where each row becomes ~2.4px tall
+   and text overlaps into illegible smudges. Pinning at 0 keeps every
+   row at its natural ~19px height so `.rel-col`'s `overflow-y: auto`
+   can scroll properly instead. */
+.rel-empty {
+    color: var(--text-muted);
+    padding: 1px 0;
+    flex-shrink: 0;
+}
+.rel-link,
+.rel-this {
+    color: var(--accent);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 1px 0;
+    flex-shrink: 0;
+}
+.rel-link {
+    cursor: pointer;
+    transition: color 0.1s;
+}
+.rel-link:hover { text-decoration: underline; }
+.rel-cross {
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 1px 0;
+    flex-shrink: 0;
+}
+/* Partition rows for dialects where partitions aren't separate tables
+   (MySQL). Inherit the surrounding cell's readable colour — the schema
+   explorer pane is light-themed and uses --ex-text, while the dark-theme
+   contexts use --text. Setting an explicit color here would clash with
+   one of them. */
+.rel-plain {
+    cursor: default;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 1px 0;
+}
+
+/* Partitions section — sits between Indexes and Relationships. Reuses
+   .schema-table for the row chrome. Columns size to content (the bound
+   expression is wide for PG; Name/Rows/Data are narrow). The schema-tab's
+   outer scroll handles long partition lists if they ever appear. */

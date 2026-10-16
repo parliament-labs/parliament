@@ -1,0 +1,68 @@
+{
+  "tour-03-welcome-owl.png": {
+    "filename": "tour-03-welcome-owl.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:30:59.294Z",
+    "specFile": "02-tour.spec.ts"
+  },
+  "tour-01-sidebar-with-bell.png": {
+    "filename": "tour-01-sidebar-with-bell.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:30:59.353Z",
+    "specFile": "02-tour.spec.ts"
+  },
+  "tour-02-add-connection-form.png": {
+    "filename": "tour-02-add-connection-form.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:30:59.494Z",
+    "specFile": "02-tour.spec.ts"
+  },
+  "activity-01-open.png": {
+    "filename": "activity-01-open.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:02.459Z",
+    "specFile": "04-activity-lock.spec.ts"
+  },
+  "activity-02-three-shells-split.png": {
+    "filename": "activity-02-three-shells-split.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:03.179Z",
+    "specFile": "04-activity-lock.spec.ts"
+  },
+  "activity-03-lock-wait-visible.png": {
+    "filename": "activity-03-lock-wait-visible.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:09.350Z",
+    "specFile": "04-activity-lock.spec.ts"
+  },
+  "activity-04-lock-scroll.png": {
+    "filename": "activity-04-lock-scroll.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:09.399Z",
+    "specFile": "04-activity-lock.spec.ts"
+  },
+  "schema-01-table-list.png": {
+    "filename": "schema-01-table-list.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:01.299Z",
+    "specFile": "03-schema-explorer.spec.ts"
+  },
+  "schema-02-table-detail.png": {
+    "filename": "schema-02-table-detail.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:01.500Z",
+    "specFile": "03-schema-explorer.spec.ts"
+  },
+  "schema-03-view-structure.png": {
+    "filename": "schema-03-view-structure.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:31:01.789Z",
+    "specFile": "03-schema-explorer.spec.ts"
+  },
+  "tour-04-tabs-splits-control.png": {
+    "filename": "tour-04-tabs-splits-control.png",
+    "sha": "07a66e7",
+    "isoTimestamp": "2026-10-16T15:30:59.799Z",
+    "specFile": "02-tour.spec.ts"
+  }
+}

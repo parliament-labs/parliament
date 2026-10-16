@@ -1,0 +1,14 @@
+Field	Type	Null	Default	Extra	Comment
+film_id	int unsigned	NO		auto_increment	
+title	varchar(255)	NO			
+description	text	YES			
+release_year	year	YES			
+language_id	int unsigned	NO			
+original_language_id	int unsigned	YES			
+rental_duration	tinyint unsigned	NO	3		
+rental_rate	decimal(4,2)	NO	4.99		
+length	smallint unsigned	YES			
+replacement_cost	decimal(5,2)	NO	19.99		
+rating	enum('G','PG','PG-13','R','NC-17')	YES	G		
+special_features	set('Trailers','Commentaries','Deleted Scenes','Behind the Scenes')	YES			
+last_update	timestamp	NO	CURRENT_TIMESTAMP	DEFAULT_GENERATED on update CURRENT_TIMESTAMP	

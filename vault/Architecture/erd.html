@@ -1,0 +1,1005 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>sakila · address — ERD · Tyto</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ink: #0e0a08;
+  --soot: #15110d;
+  --char: #1f1a14;
+  --rule: #231d16;
+  --bone: #6e644f;
+  --ash: #a89a82;
+  --parchment: #ece2d2;
+  --sentinel: #6cb3f0;
+  --sentinel-bright: #9ed1ff;
+  --sentinel-edge: rgba(108, 179, 240, 0.55);
+  --sentinel-edge-target: rgba(158, 209, 255, 0.85);
+  --phosphor: #f0a04a;
+  --signal-red: #d8584c;
+  --signal-amber: #d18a30;
+  --signal-green: #5fa470;
+  --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100%; height: 100%; }
+body {
+  background: var(--ink);
+  color: var(--parchment);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  font-feature-settings: "calt" 1;
+  overflow: hidden;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--ink);
+  height: 52px;
+  position: relative;
+  z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 14px; }
+.owl { width: 22px; height: 22px; color: var(--phosphor); }
+.wordmark {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--parchment);
+}
+.target-crumb {
+  margin-left: 16px;
+  color: var(--ash);
+  font-size: 12px;
+  border-left: 1px solid var(--rule);
+  padding-left: 16px;
+}
+.target-crumb .schema { color: var(--bone); }
+.target-crumb .name { color: var(--sentinel-bright); font-weight: 500; }
+.target-crumb .sep { color: var(--bone); margin: 0 6px; }
+
+.view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--ink);
+}
+.view-toggle button {
+  background: transparent;
+  color: var(--ash);
+  border: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  padding: 9px 16px;
+  cursor: pointer;
+  transition: color 160ms cubic-bezier(0.16, 1, 0.3, 1), background 160ms;
+}
+.view-toggle button:hover { color: var(--parchment); }
+.view-toggle button.active { color: var(--sentinel-bright); background: var(--soot); }
+.view-toggle button + button { border-left: 1px solid var(--rule); }
+
+.canvas {
+  position: relative;
+  width: 100%;
+  height: calc(100% - 52px);
+  overflow: auto;
+  background:
+    radial-gradient(ellipse at center, rgba(255,255,255,0.012) 0%, transparent 60%),
+    var(--ink);
+}
+.canvas::-webkit-scrollbar { width: 10px; height: 10px; }
+.canvas::-webkit-scrollbar-track { background: var(--ink); }
+.canvas::-webkit-scrollbar-thumb { background: var(--char); border-radius: 5px; }
+.canvas::-webkit-scrollbar-thumb:hover { background: var(--rule); }
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 100%;
+  min-height: 100%;
+}
+
+.band-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.band-labels.hidden { display: none; }
+.band-label {
+  position: absolute;
+  top: 18px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--bone);
+  transform: translateX(-50%);
+}
+.band-label.target { color: var(--phosphor); }
+
+.edges {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+.edge { fill: none; stroke: var(--sentinel-edge); stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+.edge.target { stroke: var(--sentinel-edge-target); stroke-width: 1.25; }
+.edge-marker { stroke: var(--sentinel-edge); stroke-width: 1; stroke-linecap: round; fill: none; }
+.edge-marker.target { stroke: var(--sentinel-edge-target); stroke-width: 1.25; }
+
+.cards {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+}
+
+.card {
+  position: absolute;
+  background: var(--soot);
+  border-radius: 4px;
+  width: 220px;
+  font-size: 12px;
+  user-select: none;
+  border: 1px solid transparent;
+  transition: border-color 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.card.target {
+  width: 240px;
+  border-color: var(--sentinel);
+  background: var(--soot);
+}
+.card-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sentinel);
+  padding: 8px 14px 8px;
+  border-bottom: 1px solid var(--rule);
+  white-space: nowrap;
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+}
+.card.target .card-name { color: var(--sentinel-bright); }
+.card-name .schema { color: var(--bone); }
+.card-cols { padding: 4px 0 6px; }
+.col {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2px 14px;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: nowrap;
+  height: 22px;
+  box-sizing: border-box;
+}
+.col-name { color: var(--parchment); font-weight: 400; }
+.col-anno {
+  color: var(--ash);
+  font-size: 10.5px;
+  letter-spacing: 0;
+  font-weight: 400;
+  margin-left: 12px;
+}
+.col-anno.pk { color: var(--sentinel); }
+.col-anno.fk { color: var(--sentinel); }
+.col-anno.a  { color: var(--phosphor); }
+.col.relevant {
+  background: var(--char);
+}
+.col.relevant .col-name { color: var(--parchment); }
+
+.legend {
+  position: fixed;
+  bottom: 14px;
+  right: 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bone);
+  z-index: 50;
+  background: var(--ink);
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+}
+.legend-item { display: flex; align-items: center; gap: 8px; }
+.legend-swatch { display: inline-block; width: 14px; height: 1px; background: var(--sentinel-edge); }
+.legend-swatch.target { background: var(--sentinel-edge-target); height: 1.5px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .card, .view-toggle button { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="owl" viewBox="0 0 32 32" aria-hidden="true">
+      <path fill="currentColor" d="M16 4c-4.4 0-8 3.1-8 7 0 1.5.4 2.8 1.2 3.9C7.6 15.6 6 17.5 6 19.5 6 24.2 10.5 28 16 28s10-3.8 10-8.5c0-2-1.6-3.9-3.2-4.6.8-1.1 1.2-2.4 1.2-3.9 0-3.9-3.6-7-8-7zm-3.7 8.2c1.5 0 2.7 1.2 2.7 2.7s-1.2 2.7-2.7 2.7-2.7-1.2-2.7-2.7 1.2-2.7 2.7-2.7zm7.4 0c1.5 0 2.7 1.2 2.7 2.7s-1.2 2.7-2.7 2.7-2.7-1.2-2.7-2.7 1.2-2.7 2.7-2.7zM12.3 14a.9.9 0 100 1.8.9.9 0 000-1.8zm7.4 0a.9.9 0 100 1.8.9.9 0 000-1.8zM16 19.5l-1.4 1.7h.7v1.3h1.4v-1.3h.7L16 19.5z"/>
+    </svg>
+    <span class="wordmark">Parliament · Tyto</span>
+    <span class="target-crumb">
+      <span class="schema">sakila</span><span class="sep">·</span><span class="name">address</span><span class="sep">·</span>ERD
+    </span>
+  </div>
+  <nav class="view-toggle" role="tablist" aria-label="Layout mode">
+    <button data-view="grid" class="active" role="tab" aria-selected="true">Grid</button>
+    <button data-view="arc" role="tab" aria-selected="false">Arc</button>
+  </nav>
+</header>
+
+<main class="canvas" id="canvas">
+  <div class="stage" id="stage">
+    <div class="band-labels" id="bandLabels"></div>
+    <svg class="edges" id="edges"></svg>
+    <div class="cards" id="cards"></div>
+  </div>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch target"></span>Target relations</span>
+    <span class="legend-item"><span class="legend-swatch"></span>Generation links</span>
+  </div>
+</main>
+
+<script>
+const SCHEMA = 'sakila';
+const TARGET = 'address';
+
+const TABLES = {
+  country: {
+    gen: -2,
+    cols: [
+      ['country_id', 'pk'], ['country', null], ['last_update', null]
+    ]
+  },
+  city: {
+    gen: -1,
+    cols: [
+      ['city_id', 'pk'], ['city', null], ['country_id', 'fk'], ['last_update', null]
+    ]
+  },
+  address: {
+    gen: 0,
+    target: true,
+    cols: [
+      ['address_id', 'pk'], ['address', null], ['address2', null],
+      ['district', null], ['city_id', 'fk'], ['postal_code', null],
+      ['phone', null], ['last_update', null]
+    ]
+  },
+  customer: {
+    gen: 1,
+    cols: [
+      ['customer_id', 'pk'], ['store_id', 'fk'], ['first_name', null],
+      ['last_name', null], ['address_id', 'fk'], ['create_date', null]
+    ]
+  },
+  staff: {
+    gen: 1,
+    cols: [
+      ['staff_id', 'pk'], ['first_name', null], ['last_name', null],
+      ['address_id', 'fk'], ['email', null], ['store_id', 'fk']
+    ]
+  },
+  store: {
+    gen: 1,
+    cols: [
+      ['store_id', 'pk'], ['manager_staff_id', 'fk'],
+      ['address_id', 'fk'], ['last_update', null]
+    ]
+  },
+  payment: {
+    gen: 2,
+    cols: [
+      ['payment_id', 'pk'], ['customer_id', 'fk'], ['staff_id', 'fk'],
+      ['amount', null], ['payment_date', null]
+    ]
+  },
+  rental: {
+    gen: 2,
+    cols: [
+      ['rental_id', 'pk'], ['rental_date', null], ['customer_id', 'fk'],
+      ['staff_id', 'fk'], ['return_date', null]
+    ]
+  },
+  inventory: {
+    gen: 2,
+    cols: [
+      ['inventory_id', 'pk'], ['film_id', null],
+      ['store_id', 'fk'], ['last_update', null]
+    ]
+  },
+};
+
+// Each edge: parent (PK side) → child (FK side). Arrow renders at child end.
+const EDGES = [
+  { from: 'country',  fromCol: 'country_id',  to: 'city',      toCol: 'country_id'  },
+  { from: 'city',     fromCol: 'city_id',     to: 'address',   toCol: 'city_id'     },
+  { from: 'address',  fromCol: 'address_id',  to: 'customer',  toCol: 'address_id'  },
+  { from: 'address',  fromCol: 'address_id',  to: 'staff',     toCol: 'address_id'  },
+  { from: 'address',  fromCol: 'address_id',  to: 'store',     toCol: 'address_id'  },
+  { from: 'customer', fromCol: 'customer_id', to: 'payment',   toCol: 'customer_id' },
+  { from: 'staff',    fromCol: 'staff_id',    to: 'payment',   toCol: 'staff_id'    },
+  { from: 'customer', fromCol: 'customer_id', to: 'rental',    toCol: 'customer_id' },
+  { from: 'staff',    fromCol: 'staff_id',    to: 'rental',    toCol: 'staff_id'    },
+  { from: 'store',    fromCol: 'store_id',    to: 'inventory', toCol: 'store_id'    },
+];
+
+const HEADER_HEIGHT = 36;     // card name row height
+const COL_HEIGHT = 22;        // each column row
+const CARD_PAD_TOP = 4;       // card-cols padding top
+const CARD_PAD_BOTTOM = 6;
+const cardEls = {};
+const cardPositions = {};
+const canvas = document.getElementById('canvas');
+const stage = document.getElementById('stage');
+
+function viewportSize() {
+  // Use canvas client size as the "viewport" for layout centering;
+  // the stage may grow beyond this if the layout demands it.
+  return { W: canvas.clientWidth, H: canvas.clientHeight };
+}
+
+function buildCards() {
+  const cardsRoot = document.getElementById('cards');
+  cardsRoot.innerHTML = '';
+  for (const [name, t] of Object.entries(TABLES)) {
+    const card = document.createElement('div');
+    card.className = 'card' + (t.target ? ' target' : '');
+    card.dataset.name = name;
+
+    const nameRow = document.createElement('div');
+    nameRow.className = 'card-name';
+    nameRow.innerHTML = `<span class="schema">${SCHEMA}.</span>${name}`;
+    card.appendChild(nameRow);
+
+    const colsContainer = document.createElement('div');
+    colsContainer.className = 'card-cols';
+    for (const [colName, kind] of t.cols) {
+      const col = document.createElement('div');
+      col.className = 'col';
+      col.dataset.col = colName;
+      col.innerHTML =
+        `<span class="col-name">${colName}</span>` +
+        `<span class="col-anno ${kind || ''}">${kind ? '(' + kind + ')' : ''}</span>`;
+      colsContainer.appendChild(col);
+    }
+    card.appendChild(colsContainer);
+    cardsRoot.appendChild(card);
+    cardEls[name] = card;
+  }
+}
+
+function cardHeight(name) {
+  const cols = TABLES[name].cols.length;
+  return HEADER_HEIGHT + CARD_PAD_TOP + cols * COL_HEIGHT + CARD_PAD_BOTTOM;
+}
+
+function colYOffset(name, colName) {
+  const idx = TABLES[name].cols.findIndex(c => c[0] === colName);
+  return HEADER_HEIGHT + CARD_PAD_TOP + idx * COL_HEIGHT + COL_HEIGHT / 2;
+}
+
+function placeCard(name, x, y) {
+  const el = cardEls[name];
+  el.style.left = x + 'px';
+  el.style.top = y + 'px';
+  cardPositions[name] = {
+    x, y,
+    w: el.offsetWidth || (TABLES[name].target ? 240 : 220),
+    h: cardHeight(name),
+  };
+}
+
+// --- Layered-graph helpers (median / barycenter sweep) ------------------
+
+function median(arr) {
+  if (arr.length === 0) return null;
+  const a = arr.slice().sort((x, y) => x - y);
+  const mid = Math.floor(a.length / 2);
+  return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+}
+
+function reorderForMinCrossings() {
+  const layers = { '-2': [], '-1': [], '0': [], '1': [], '2': [] };
+  for (const [name, t] of Object.entries(TABLES)) layers[String(t.gen)].push(name);
+
+  const downEdges = {}; // parent -> [children]
+  const upEdges = {};   // child  -> [parents]
+  for (const e of EDGES) {
+    (downEdges[e.from] = downEdges[e.from] || []).push(e.to);
+    (upEdges[e.to]   = upEdges[e.to]   || []).push(e.from);
+  }
+
+  for (let pass = 0; pass < 8; pass++) {
+    // Forward sweep: order each layer by median index in the previous layer
+    for (const g of [-1, 0, 1, 2]) {
+      const layer = layers[String(g)];
+      const prev = layers[String(g - 1)];
+      if (!prev || prev.length === 0) continue;
+      const idx = {}; prev.forEach((n, i) => idx[n] = i);
+      layer.sort((a, b) => {
+        const am = median((upEdges[a] || []).map(n => idx[n]).filter(x => x !== undefined));
+        const bm = median((upEdges[b] || []).map(n => idx[n]).filter(x => x !== undefined));
+        return ((am ?? 1e9) - (bm ?? 1e9));
+      });
+    }
+    // Backward sweep
+    for (const g of [1, 0, -1, -2]) {
+      const layer = layers[String(g)];
+      const next = layers[String(g + 1)];
+      if (!next || next.length === 0) continue;
+      const idx = {}; next.forEach((n, i) => idx[n] = i);
+      layer.sort((a, b) => {
+        const am = median((downEdges[a] || []).map(n => idx[n]).filter(x => x !== undefined));
+        const bm = median((downEdges[b] || []).map(n => idx[n]).filter(x => x !== undefined));
+        return ((am ?? 1e9) - (bm ?? 1e9));
+      });
+    }
+  }
+  return layers;
+}
+
+function layoutGrid() {
+  const { W, H } = viewportSize();
+
+  const bandLabels = ['GRANDPARENT', 'PARENT', 'TARGET', 'CHILD', 'GRANDCHILD'];
+  const cardW = 220, targetW = 240;
+  const widths = { '-2': cardW, '-1': cardW, '0': targetW, '1': cardW, '2': cardW };
+  const colGap = 110;
+  const totalW = Object.values(widths).reduce((a, b) => a + b, 0) + colGap * 4;
+  const startX = Math.max(40, (W - totalW) / 2);
+
+  const xByGen = {};
+  let cursor = startX;
+  for (const g of [-2, -1, 0, 1, 2]) { xByGen[g] = cursor; cursor += widths[String(g)] + colGap; }
+
+  const layers = reorderForMinCrossings();
+  const minGap = 32;
+
+  // 1. Place TARGET at canvas center (vertically). Adjust later if needed for chain.
+  const targetH = cardHeight(TARGET);
+  // We want headroom for parent chain that may push above the target naturally.
+  const headroom = 200;
+  const baseY = Math.max(80, headroom);
+  placeCard(TARGET, xByGen[0], baseY);
+
+  // 2. Walk parent chain (gen -1, -2, ...) — align PK row to FK row in the next layer.
+  function placeParentLayer(g) {
+    const items = layers[String(g)];
+    const next = layers[String(g + 1)];
+    if (!items || items.length === 0) return;
+
+    // For each item, compute desired y from the edges going to the next layer.
+    // ideal y = nextCard.y + colYOffset(nextCard, FKcol) - colYOffset(thisCard, PKcol)
+    // (averaged if multiple)
+    const desired = {};
+    for (const name of items) {
+      const outs = EDGES.filter(e => e.from === name && next.includes(e.to));
+      if (outs.length === 0) { desired[name] = baseY; continue; }
+      const ys = outs.map(e => {
+        const childP = cardPositions[e.to];
+        const childFkY = childP.y + colYOffset(e.to, e.toCol);
+        const pkOff = colYOffset(name, e.fromCol);
+        return childFkY - pkOff;
+      });
+      desired[name] = ys.reduce((a, b) => a + b, 0) / ys.length;
+    }
+
+    // Order items by their existing layer position (already sorted by sweep) and stack with min gap,
+    // anchored to "desired" but pushed apart to honor min spacing.
+    // We'll do a simple resolve-overlaps pass.
+    const placed = items.map(n => ({ name: n, y: desired[n], h: cardHeight(n) }));
+    // Try to honor desired positions but enforce monotonic spacing
+    placed.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < placed.length; i++) {
+      const minY = placed[i - 1].y + placed[i - 1].h + minGap;
+      if (placed[i].y < minY) placed[i].y = minY;
+    }
+    for (const p of placed) placeCard(p.name, xByGen[g], p.y);
+  }
+
+  placeParentLayer(-1);
+  placeParentLayer(-2);
+
+  // 3. Place CHILDREN (gen 1) — distribute their FK rows across target's right edge inner area.
+  function placeChildren() {
+    const items = layers['1'];
+    if (!items || items.length === 0) return;
+
+    // Each child's address_id row should anchor at a distributed y on target's right edge.
+    const targetP = cardPositions[TARGET];
+    const innerPad = 18;
+    const top = targetP.y + innerPad;
+    const bot = targetP.y + targetP.h - innerPad;
+
+    // For each child, what's the FK column to TARGET?
+    const fkToTarget = {};
+    for (const name of items) {
+      const e = EDGES.find(ed => ed.from === TARGET && ed.to === name);
+      if (e) fkToTarget[name] = e.toCol;
+    }
+
+    // Distribute desired anchor y across [top, bot]
+    const n = items.length;
+    const desired = {};
+    items.forEach((name, i) => {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      const anchorY = top + (bot - top) * t;
+      const fkOff = colYOffset(name, fkToTarget[name]);
+      desired[name] = anchorY - fkOff;
+    });
+
+    // Resolve overlaps with min gap.
+    const placed = items.map(n => ({ name: n, y: desired[n], h: cardHeight(n) }));
+    placed.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < placed.length; i++) {
+      const minY = placed[i - 1].y + placed[i - 1].h + minGap;
+      if (placed[i].y < minY) placed[i].y = minY;
+    }
+    // Also clamp top to a sensible minimum
+    if (placed.length && placed[0].y < 80) {
+      const shift = 80 - placed[0].y;
+      for (const p of placed) p.y += shift;
+    }
+    for (const p of placed) placeCard(p.name, xByGen[1], p.y);
+  }
+  placeChildren();
+
+  // 4. Place GRANDCHILDREN (gen 2) — try to align FK rows to one of their parent's PK row.
+  function placeGrandchildren() {
+    const items = layers['2'];
+    if (!items || items.length === 0) return;
+
+    const desired = {};
+    for (const name of items) {
+      // Edges from any child (gen 1) to this grandchild
+      const ins = EDGES.filter(e => e.to === name && TABLES[e.from].gen === 1);
+      if (ins.length === 0) { desired[name] = cardPositions[TARGET].y; continue; }
+      // Average each parent's PK row y minus this grandchild's FK row offset
+      const ys = ins.map(e => {
+        const parentP = cardPositions[e.from];
+        const parentPkY = parentP.y + colYOffset(e.from, e.fromCol);
+        const fkOff = colYOffset(name, e.toCol);
+        return parentPkY - fkOff;
+      });
+      desired[name] = ys.reduce((a, b) => a + b, 0) / ys.length;
+    }
+
+    const placed = items.map(n => ({ name: n, y: desired[n], h: cardHeight(n) }));
+    placed.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < placed.length; i++) {
+      const minY = placed[i - 1].y + placed[i - 1].h + minGap;
+      if (placed[i].y < minY) placed[i].y = minY;
+    }
+    if (placed.length && placed[0].y < 80) {
+      const shift = 80 - placed[0].y;
+      for (const p of placed) p.y += shift;
+    }
+    for (const p of placed) placeCard(p.name, xByGen[2], p.y);
+  }
+  placeGrandchildren();
+
+  // Normalize so the topmost card sits at y >= 80
+  let minY = Infinity;
+  for (const p of Object.values(cardPositions)) minY = Math.min(minY, p.y);
+  if (minY < 80) {
+    const shift = 80 - minY;
+    for (const name of Object.keys(cardPositions)) {
+      const p = cardPositions[name];
+      p.y += shift;
+      cardEls[name].style.top = p.y + 'px';
+    }
+  }
+
+  renderBandLabels(
+    [-2, -1, 0, 1, 2].map(g => xByGen[g]),
+    bandLabels,
+    [-2, -1, 0, 1, 2].map(g => widths[String(g)])
+  );
+  return { stageRightPad: 60, stageBottomPad: 60 };
+}
+
+function layoutArc() {
+  const layers = reorderForMinCrossings();
+
+  // Generous fixed radii so cards have actual breathing room.
+  const r1 = 400;          // inner ring (parents / children)
+  const r2 = 840;          // outer ring (grandparents / grandchildren)
+  const cardW = 220;
+  const targetW = 240;
+  const minVertGap = 30;             // minimum vertical gap between adjacent cards on same arc
+
+  // Pick a comfortable initial center; the normalization pass at the end shifts
+  // everything so the leftmost / topmost card sits at >= 80px.
+  const cx = 1000;
+  const cy = 700;
+
+  // Target at center
+  const targetH = cardHeight(TARGET);
+  placeCard(TARGET, cx - targetW / 2, cy - targetH / 2);
+
+  // Place a list of cards on one side of the arc at radius r.
+  // sideAngle = 0 for right hemisphere, Math.PI for left hemisphere.
+  // Angular step between adjacent cards is computed from the actual card
+  // heights so vertical separation always exceeds cardH + minVertGap, no
+  // matter how many items the side has.
+  function placeSide(items, r, sideAngle) {
+    if (!items || items.length === 0) return;
+    const angles = [];
+    if (items.length === 1) {
+      angles.push(sideAngle);
+    } else {
+      // Required vertical separation between adjacent cards
+      const maxH = Math.max(...items.map(cardHeight));
+      const requiredSep = maxH + minVertGap;
+      // Step angle so r * sin(step) >= requiredSep
+      const stepAngle = Math.min(
+        Math.PI * 0.45,  // cap at ±81° per pair (i.e. don't crowd both poles)
+        Math.asin(Math.min(0.95, requiredSep / r))
+      );
+      const totalSpread = (items.length - 1) * stepAngle;
+      const start = sideAngle - totalSpread / 2;
+      for (let i = 0; i < items.length; i++) angles.push(start + stepAngle * i);
+    }
+    items.forEach((name, i) => {
+      const theta = angles[i];
+      const innerX = cx + Math.cos(theta) * r;
+      const innerY = cy + Math.sin(theta) * r;
+      const h = cardHeight(name);
+      // Card's inner edge sits on the arc; the card extends away from target.
+      // Right hemisphere: card's left edge at innerX → top-left.x = innerX.
+      // Left hemisphere:  card's right edge at innerX → top-left.x = innerX - cardW.
+      const isRight = Math.cos(theta) >= 0;
+      const x = isRight ? innerX : innerX - cardW;
+      const y = innerY - h / 2;
+      placeCard(name, x, y);
+    });
+  }
+
+  placeSide(layers['-1'], r1, Math.PI);
+  placeSide(layers['-2'], r2, Math.PI);
+  placeSide(layers['1'],  r1, 0);
+  placeSide(layers['2'],  r2, 0);
+
+  document.getElementById('bandLabels').classList.add('hidden');
+
+  // Normalize so leftmost and topmost cards sit at >= 80px.
+  let minX = Infinity, minY = Infinity;
+  for (const p of Object.values(cardPositions)) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+  }
+  const shiftX = minX < 80 ? 80 - minX : 0;
+  const shiftY = minY < 80 ? 80 - minY : 0;
+  if (shiftX || shiftY) {
+    for (const name of Object.keys(cardPositions)) {
+      const p = cardPositions[name];
+      p.x += shiftX;
+      p.y += shiftY;
+      cardEls[name].style.left = p.x + 'px';
+      cardEls[name].style.top = p.y + 'px';
+    }
+  }
+
+  return { stageRightPad: 80, stageBottomPad: 80 };
+}
+
+function renderBandLabels(xs, labels, widths) {
+  const root = document.getElementById('bandLabels');
+  root.classList.remove('hidden');
+  root.innerHTML = '';
+  xs.forEach((x, i) => {
+    const el = document.createElement('div');
+    el.className = 'band-label' + (labels[i] === 'TARGET' ? ' target' : '');
+    el.style.left = (x + widths[i] / 2) + 'px';
+    el.textContent = labels[i];
+    root.appendChild(el);
+  });
+}
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+
+// Child anchor: precise — at the FK column row on the side facing the parent.
+function childAnchor(edge) {
+  const childP = cardPositions[edge.to];
+  const parentP = cardPositions[edge.from];
+  const childCx = childP.x + childP.w / 2;
+  const parentCx = parentP.x + parentP.w / 2;
+  const side = parentCx < childCx ? 'left' : 'right';
+  const x = side === 'right' ? childP.x + childP.w : childP.x;
+  const y = childP.y + colYOffset(edge.to, edge.toCol);
+  return { x, y, side };
+}
+
+// Compute parent-side anchors per parent + side.
+//
+// Rule of thumb: if an edge's ideal y (= child FK row y) falls *within* the
+// parent's vertical extent, it is PINNED there — never compromised. The
+// resulting line is perfectly horizontal. If the ideal is *outside* the
+// parent's extent, the edge is placed in the largest available gap between
+// pinned anchors. This naturally produces "out-of-range edges route around
+// pinned ones with breathing room", and avoids the small zigzags that come
+// from forcing min-spacing among already-good anchors.
+function computeParentAnchors(edges) {
+  const groups = {};
+  for (const e of edges) {
+    const parentP = cardPositions[e.from];
+    const childP  = cardPositions[e.to];
+    const parentCx = parentP.x + parentP.w / 2;
+    const childCx  = childP.x + childP.w / 2;
+    const side = childCx > parentCx ? 'right' : 'left';
+    const idealY = childP.y + colYOffset(e.to, e.toCol);
+    const key = e.from + '|' + side;
+    (groups[key] = groups[key] || []).push({ e, side, idealY });
+  }
+
+  const innerPad = 14;
+  const minSpacing = 28;
+
+  for (const items of Object.values(groups)) {
+    const parentP = cardPositions[items[0].e.from];
+    const side = items[0].side;
+    const x = side === 'right' ? parentP.x + parentP.w : parentP.x;
+    const minY = parentP.y + innerPad;
+    const maxY = parentP.y + parentP.h - innerPad;
+
+    const pinned = items.filter(it => it.idealY >= minY && it.idealY <= maxY);
+    const floating = items.filter(it => it.idealY < minY || it.idealY > maxY);
+    // Process floating in ideal-y order so top-wanters take top gaps and
+    // bottom-wanters take bottom gaps (natural geographic order).
+    floating.sort((a, b) => a.idealY - b.idealY);
+
+    // Pin perfect anchors at their ideal, no compromise.
+    pinned.forEach(it => { it.placedY = it.idealY; });
+
+    // For each floating anchor, place in the largest available gap between
+    // already-placed anchors. Compute gaps fresh each iteration so successive
+    // floating anchors don't bunch up.
+    for (const it of floating) {
+      const placedYs = items
+        .filter(o => o.placedY != null && o !== it)
+        .map(o => o.placedY)
+        .sort((a, b) => a - b);
+
+      const boundaries = [minY, ...placedYs, maxY];
+      let best = null;
+      for (let i = 0; i < boundaries.length - 1; i++) {
+        const isFirstGap = i === 0;
+        const isLastGap  = i === boundaries.length - 2;
+        const start = boundaries[i]     + (isFirstGap ? 0 : minSpacing);
+        const end   = boundaries[i + 1] - (isLastGap  ? 0 : minSpacing);
+        const size  = end - start;
+        if (size > 0 && (!best || size > best.size)) {
+          best = { mid: (start + end) / 2, size };
+        }
+      }
+      it.placedY = best ? best.mid : (it.idealY > maxY ? maxY : minY);
+    }
+
+    for (const it of items) {
+      it.e._parentAnchor = { x, y: it.placedY, side, idealY: it.idealY };
+    }
+  }
+}
+
+// When multiple non-horizontal edges cross the same band gap, each gets its own
+// vertical lane (mid_x) so the H-V-H paths don't collide.
+function assignLanes(edges) {
+  const gaps = {};
+  for (const e of edges) {
+    const horizontal = Math.abs(e._parentAnchor.y - e._childAnchor.y) < 1;
+    if (horizontal) continue;
+    const k = `${TABLES[e.from].gen}->${TABLES[e.to].gen}`;
+    (gaps[k] = gaps[k] || []).push(e);
+  }
+  for (const list of Object.values(gaps)) {
+    // Lane order = parent-anchor y order, so lanes flow visually
+    list.sort((a, b) => a._parentAnchor.y - b._parentAnchor.y);
+    const n = list.length;
+    list.forEach((e, i) => {
+      const px = e._parentAnchor.x;
+      const cx = e._childAnchor.x;
+      const minX = Math.min(px, cx);
+      const maxX = Math.max(px, cx);
+      const t = (i + 1) / (n + 1);
+      e._midX = minX + (maxX - minX) * t;
+    });
+  }
+}
+
+function buildOrthogonalSharpPath(p, c, midX) {
+  // Pure horizontal if y aligns
+  if (Math.abs(p.y - c.y) < 1) {
+    return `M ${p.x} ${p.y} L ${c.x} ${c.y}`;
+  }
+  // Otherwise H-V-H with sharp 90° corners
+  return `M ${p.x} ${p.y} L ${midX} ${p.y} L ${midX} ${c.y} L ${c.x} ${c.y}`;
+}
+
+function buildArcPath(p, c) {
+  const dx = c.x - p.x, dy = c.y - p.y;
+  const dist = Math.hypot(dx, dy);
+  const k = Math.min(dist * 0.5, 160);
+  const c1x = p.side === 'right' ? p.x + k : p.x - k;
+  const c2x = c.side === 'right' ? c.x + k : c.x - k;
+  return `M ${p.x} ${p.y} C ${c1x} ${p.y}, ${c2x} ${c.y}, ${c.x} ${c.y}`;
+}
+
+// Crow's foot at the many (child / FK) end.
+// Standard ERD convention: apex sits ON the relationship line ~10px back from
+// the entity edge; three prongs fan FROM the apex TO three points on the
+// entity edge (one straight, two splayed perpendicular to the line). The
+// resulting `<`-shape opens toward the entity, not away.
+function drawCrowsFoot(svg, end, fromX, fromY, isTarget) {
+  let dx = end.x - fromX, dy = end.y - fromY;
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len; dy /= len;            // unit vector pointing TOWARD entity
+  const px = -dy, py = dx;         // perpendicular to line direction
+  const L = 10;                    // depth of crow's foot back from entity
+  const splay = 5;                 // half-spread of outer tips on entity edge
+  const apexX = end.x - dx * L;
+  const apexY = end.y - dy * L;
+  const tips = [
+    { x: end.x,                y: end.y                },  // straight (along the line)
+    { x: end.x + px * splay,   y: end.y + py * splay   },  // splay up
+    { x: end.x - px * splay,   y: end.y - py * splay   },  // splay down
+  ];
+  const cls = 'edge-marker' + (isTarget ? ' target' : '');
+  for (const t of tips) {
+    const line = document.createElementNS(SVGNS, 'line');
+    line.setAttribute('x1', apexX);
+    line.setAttribute('y1', apexY);
+    line.setAttribute('x2', t.x);
+    line.setAttribute('y2', t.y);
+    line.setAttribute('class', cls);
+    svg.appendChild(line);
+  }
+}
+
+// Single perpendicular tick at the one (parent / PK) end.
+function drawOneTick(svg, end, fromX, fromY, isTarget) {
+  let dx = end.x - fromX, dy = end.y - fromY;
+  const len = Math.hypot(dx, dy) || 1;
+  dx /= len; dy /= len;
+  const back = 8, half = 5;
+  const cx = end.x - dx * back;
+  const cy = end.y - dy * back;
+  const px = -dy * half, py = dx * half;
+  const tick = document.createElementNS(SVGNS, 'line');
+  tick.setAttribute('x1', cx + px);
+  tick.setAttribute('y1', cy + py);
+  tick.setAttribute('x2', cx - px);
+  tick.setAttribute('y2', cy - py);
+  tick.setAttribute('class', 'edge-marker' + (isTarget ? ' target' : ''));
+  svg.appendChild(tick);
+}
+
+function renderEdges(mode, w, h) {
+  const svg = document.getElementById('edges');
+  svg.innerHTML = '';
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  svg.style.width = w + 'px';
+  svg.style.height = h + 'px';
+
+  const isTarget = (e) => e.from === TARGET || e.to === TARGET;
+
+  // Pass 1: child anchors (precise, at FK column row)
+  for (const e of EDGES) e._childAnchor = childAnchor(e);
+  // Pass 2: parent anchors (per parent + side, distributed with breathing room)
+  computeParentAnchors(EDGES);
+  // Pass 3: lane assignment for non-horizontal edges in grid mode
+  if (mode === 'grid') assignLanes(EDGES);
+
+  for (const e of EDGES) {
+    const t = isTarget(e);
+    const p = e._parentAnchor;
+    const c = e._childAnchor;
+    const path = document.createElementNS(SVGNS, 'path');
+    let d;
+    if (mode === 'grid') {
+      const midX = e._midX != null ? e._midX : (p.x + c.x) / 2;
+      d = buildOrthogonalSharpPath(p, c, midX);
+    } else {
+      d = buildArcPath(p, c);
+    }
+    path.setAttribute('d', d);
+    path.setAttribute('class', 'edge' + (t ? ' target' : ''));
+    svg.appendChild(path);
+
+    // In both modes the line is horizontal at the endpoints (last segment H in
+    // grid mode; bezier control points share endpoint y in arc mode), so the
+    // crow's foot fans back horizontally and the tick is vertical.
+    drawCrowsFoot(svg, c, c.side === 'left' ? c.x - 10 : c.x + 10, c.y, t);
+    drawOneTick(svg, p, p.side === 'right' ? p.x + 10 : p.x - 10, p.y, t);
+  }
+}
+
+function highlightRelevantCols() {
+  for (const name of Object.keys(TABLES)) {
+    cardEls[name].querySelectorAll('.col').forEach(c => c.classList.remove('relevant'));
+  }
+  for (const e of EDGES) {
+    cardEls[e.from].querySelector(`.col[data-col="${e.fromCol}"]`)?.classList.add('relevant');
+    cardEls[e.to  ].querySelector(`.col[data-col="${e.toCol}"  ]`)?.classList.add('relevant');
+  }
+}
+
+let currentMode = 'grid';
+
+function sizeStageToContent(rightPad = 40, bottomPad = 40) {
+  let maxX = 0, maxY = 0;
+  for (const p of Object.values(cardPositions)) {
+    if (p.x + p.w > maxX) maxX = p.x + p.w;
+    if (p.y + p.h > maxY) maxY = p.y + p.h;
+  }
+  const W = Math.max(canvas.clientWidth, Math.ceil(maxX + rightPad));
+  const H = Math.max(canvas.clientHeight, Math.ceil(maxY + bottomPad));
+  stage.style.width = W + 'px';
+  stage.style.height = H + 'px';
+  return { W, H };
+}
+
+function render() {
+  let pads = currentMode === 'grid' ? layoutGrid() : layoutArc();
+
+  // Re-measure (font metrics may shift offsetWidth)
+  for (const name of Object.keys(TABLES)) {
+    const el = cardEls[name];
+    cardPositions[name].w = el.offsetWidth;
+    cardPositions[name].h = el.offsetHeight;
+  }
+
+  // Re-layout once with measured widths (mostly a no-op but ensures alignment)
+  pads = currentMode === 'grid' ? layoutGrid() : layoutArc();
+
+  const { W, H } = sizeStageToContent(pads.stageRightPad, pads.stageBottomPad);
+  renderEdges(currentMode, W, H);
+  highlightRelevantCols();
+}
+
+document.querySelectorAll('.view-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.view-toggle button').forEach(b => {
+      b.classList.toggle('active', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    currentMode = btn.dataset.view;
+    render();
+  });
+});
+
+window.addEventListener('resize', render);
+
+buildCards();
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(render);
+} else {
+  setTimeout(render, 100);
+}
+</script>
+</body>
+</html>

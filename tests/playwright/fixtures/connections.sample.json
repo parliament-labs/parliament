@@ -1,0 +1,26 @@
+[
+  {
+    "id": "pw-pagila",
+    "name": "Local Postgres",
+    "db_type": "postgres",
+    "host": "127.0.0.1",
+    "port": 5432,
+    "user": "postgres",
+    "password": "",
+    "database": "pagila",
+    "pinned": true,
+    "default_pane": "shell"
+  },
+  {
+    "id": "pw-sakila",
+    "name": "Local MySQL",
+    "db_type": "mysql",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "user": "root",
+    "password": "",
+    "database": "sakila",
+    "pinned": true,
+    "default_pane": "shell"
+  }
+]

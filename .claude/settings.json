@@ -1,0 +1,81 @@
+{
+  "enabledMcpjsonServers": [
+    "pagila",
+    "sakila"
+  ],
+  "permissions": {
+    "allow": [
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo fmt)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo doc:*)",
+      "Bash(cargo tree:*)",
+      "Bash(git checkout:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git stash list:*)",
+      "Bash(trunk check:*)",
+      "Bash(trunk build:*)",
+      "Bash(rustup show:*)",
+      "Bash(cmux notify:*)",
+      "Bash(cmux claude-hook:*)",
+      "Bash(cmux new-pane:*)",
+      "Bash(cmux read-screen:*)",
+      "Bash(cmux list-workspaces)",
+      "Bash(cmux list-panes:*)",
+      "Bash(psql:*)",
+      "Bash(mysql:*)",
+      "Bash(diff:*)",
+      "Bash(./.claude/skills/integration-test-sql/run.sh:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-tool-use-bash.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/stop.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/pre-compact.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

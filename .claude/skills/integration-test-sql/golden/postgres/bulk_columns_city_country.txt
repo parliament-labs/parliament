@@ -1,0 +1,7 @@
+public|city|city_id|1|1
+public|city|city|2|0
+public|city|country_id|3|0
+public|city|last_update|4|0
+public|country|country_id|1|1
+public|country|country|2|0
+public|country|last_update|3|0

@@ -1,0 +1,52 @@
+Parliament
+Copyright 2026 The Parliament Authors
+
+Licensed under the Apache License, Version 2.0 (see LICENSE). Parliament
+includes work by others, under the licenses below.
+
+------------------------------------------------------------------------
+PostgreSQL: psql and libpq
+------------------------------------------------------------------------
+
+Parliament's Postgres shell is built to behave as psql does, and parts of
+it are ports of PostgreSQL's client code: psql (src/bin/psql), its
+printing and string utilities (src/fe_utils), libpq
+(src/interfaces/libpq) and src/common. These parts reproduce psql's
+catalog queries and messages. They live chiefly in
+tyto/src/plane/postgres.rs, tyto/src/plane/postgres/, tyto/src/psql_*.rs,
+tyto/src/parser.rs, noctua/src/locale.rs and noctua/src/pgpass.rs, and
+are used under the PostgreSQL License:
+
+PostgreSQL Database Management System
+(also known as Postgres, formerly known as Postgres95)
+
+Portions Copyright (c) 1996-2026, PostgreSQL Global Development Group
+
+Portions Copyright (c) 1994, The Regents of the University of California
+
+Permission to use, copy, modify, and distribute this software and its
+documentation for any purpose, without fee, and without a written agreement
+is hereby granted, provided that the above copyright notice and this
+paragraph and the following two paragraphs appear in all copies.
+
+IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY PARTY FOR
+DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING
+LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
+DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA HAS BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS FOR A PARTICULAR PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS
+ON AN "AS IS" BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO
+PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+------------------------------------------------------------------------
+SQLx: vendor/sqlx-postgres and vendor/sqlx-mysql
+------------------------------------------------------------------------
+
+vendor/sqlx-postgres and vendor/sqlx-mysql are SQLx 0.8.6
+(https://github.com/launchbadge/sqlx), Copyright (c) 2020 LaunchBadge,
+LLC, licensed under MIT OR Apache-2.0 (the LICENSE-MIT and LICENSE-APACHE
+files in each directory). Parliament has modified them; each directory's
+PARLIAMENT.md lists the changes.

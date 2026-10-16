@@ -1,0 +1,61 @@
+[package]
+name = "tyto"
+version = "0.1.0"
+license = "Apache-2.0"
+edition = "2021"
+
+[[bin]]
+name = "tyto"
+path = "src/main.rs"
+
+[dependencies]
+shared = { path = "../shared" }
+leptos = { version = "0.6", features = ["csr"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Display width of a character, as psql's printer measures it (psql's
+# `\d` output is aligned text).
+unicode-width = "0.2"
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "WebSocket",
+    "MessageEvent",
+    "KeyboardEvent",
+    "HtmlTextAreaElement",
+    "HtmlElement",
+    "HtmlAnchorElement",
+    "CssStyleDeclaration",
+    "Element",
+    "Window",
+    "Document",
+    "Blob",
+    "BlobPropertyBag",
+    "Url",
+    "Storage",
+    "PointerEvent",
+    "ScrollIntoViewOptions",
+    "FocusOptions",
+    "ScrollLogicalPosition",
+    "ScrollBehavior",
+    "DomRect",
+    "Selection",
+    "Navigator",
+    "Clipboard",
+    "DragEvent",
+    "DataTransfer",
+    "MouseEvent",
+    "MouseEventInit",
+    "console",
+] }
+console_error_panic_hook = "0.1"
+uuid = { version = "1", features = ["v4", "js"] }
+sqlparser = "0.62"
+# SCRAM-SHA-256 password hashing for psql `\password` — all
+# pure-Rust crates that compile to wasm32 with `getrandom`'s `js`
+# feature enabled (so Web Crypto sources the salt).
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+base64 = "0.22"
+getrandom = { version = "0.2", features = ["js"] }

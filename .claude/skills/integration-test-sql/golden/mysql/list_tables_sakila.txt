@@ -1,0 +1,18 @@
+Schema	Name	Table_type	Rows	Engine
+sakila	actor	BASE TABLE	200	InnoDB
+sakila	address	BASE TABLE	603	InnoDB
+sakila	category	BASE TABLE	16	InnoDB
+sakila	city	BASE TABLE	600	InnoDB
+sakila	country	BASE TABLE	109	InnoDB
+sakila	customer	BASE TABLE	599	InnoDB
+sakila	film	BASE TABLE	1000	InnoDB
+sakila	film_actor	BASE TABLE	5462	InnoDB
+sakila	film_category	BASE TABLE	1000	InnoDB
+sakila	film_text	BASE TABLE	1000	InnoDB
+sakila	inventory	BASE TABLE	4581	InnoDB
+sakila	language	BASE TABLE	6	InnoDB
+sakila	payment	BASE TABLE	15577	InnoDB
+sakila	rental	BASE TABLE	16241	InnoDB
+sakila	staff	BASE TABLE	2	InnoDB
+sakila	store	BASE TABLE	2	InnoDB
+sakila	test_partitions	BASE TABLE	9	InnoDB

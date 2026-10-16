@@ -1,0 +1,5 @@
+PRIMARY|0|BTREE|payment_date|1|1
+PRIMARY|0|BTREE|payment_id|2|1
+idx_fk_payment_p2022_01_customer_id|1|BTREE|customer_id|1|0
+idx_fk_payment_p2022_01_staff_id|1|BTREE|staff_id|1|0
+payment_p2022_01_customer_id_idx|1|BTREE|customer_id|1|0
