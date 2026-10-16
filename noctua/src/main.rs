@@ -26,6 +26,8 @@
 
 mod db_error;
 mod editor;
+#[cfg(feature = "embed-frontend")]
+mod frontend;
 mod locale;
 mod notices;
 mod pgpass;
@@ -54,7 +56,7 @@ use sqlx::{
 };
 use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Instant};
 use tokio::sync::Mutex;
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::cors::CorsLayer;
 use uuid::Uuid;
 
 /// Split a multi-statement `fetch_many` stream into one [`ResultSet`]
@@ -493,14 +495,23 @@ async fn main() {
         .allow_methods([Method::GET, Method::POST])
         .allow_headers([header::CONTENT_TYPE]);
 
-    let app = Router::new()
-        .route("/ws", get(ws_handler))
-        .fallback_service(ServeDir::new("dist"))
-        .layer(cors)
-        .with_state(state);
+    let app = Router::new().route("/ws", get(ws_handler));
+    #[cfg(feature = "embed-frontend")]
+    let app = app.fallback_service(get(frontend::serve));
+    #[cfg(not(feature = "embed-frontend"))]
+    let app = app.fallback_service(tower_http::services::ServeDir::new("dist"));
+    let app = app.layer(cors).with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000").await.unwrap();
+    let listener = match tokio::net::TcpListener::bind("127.0.0.1:3000").await {
+        Ok(listener) => listener,
+        Err(e) => {
+            eprintln!("noctua: can't listen on 127.0.0.1:3000 ({e}). Is Parliament already running, or another program using port 3000?");
+            std::process::exit(1);
+        }
+    };
     tracing::info!("Backend listening on http://127.0.0.1:3000 (loopback only)");
+    #[cfg(feature = "embed-frontend")]
+    println!("Parliament is running: open http://localhost:3000 in your browser. Ctrl+C stops it.");
     axum::serve(listener, app).await.unwrap();
 }
 

@@ -23,6 +23,10 @@ cargo install trunk
 cargo run -p noctua           # terminal 1 — backend on localhost:3000
 trunk serve                   # terminal 2 — WASM dev server on localhost:8080, open this in browser
 
+# Release build: one binary that serves the frontend itself (what
+# .github/workflows/release.yml ships — push a `v*` tag for a draft release)
+trunk build --release && cargo build --release -p noctua --features embed-frontend
+
 # Check / lint
 cargo check                           # native targets only (fast)
 cargo check -p tyto --target wasm32-unknown-unknown  # check WASM frontend
@@ -44,7 +48,10 @@ noctua/    Axum HTTP + WebSocket server. Owns MySQL connections via sqlx.
            Loads/saves connections from ~/.sqlclient/connections.json and
            preferences from ~/.sqlclient/settings.json (settings.rs).
            editor/ opens the user's editor for \e (resolve, wrapper,
-           terminal, macos, direct, focus); notices.rs streams PG notices.
+           terminal, macos, direct, focus); notices.rs streams PG notices;
+           frontend.rs builds Tyto's dist/ into the binary under the
+           `embed-frontend` feature (the release), else dist/ is served
+           from the directory noctua starts in.
 
 vendor/    sqlx-postgres and sqlx-mysql 0.8.6, patched so a session and
            what it reports match the native CLI: command tags, an empty

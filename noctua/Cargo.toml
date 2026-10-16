@@ -31,6 +31,13 @@ futures-util = "0.3"
 tempfile = "3"
 shlex = "1"
 
+# The release build's frontend, compiled in (`--features embed-frontend`,
+# after `trunk build --release`): one binary that serves Tyto itself.
+rust-embed = { version = "8", optional = true, features = ["debug-embed", "mime-guess"] }
+
+[features]
+embed-frontend = ["dep:rust-embed"]
+
 [target.'cfg(unix)'.dependencies]
 # setsid() for directly-launched editors, so one that wants a terminal
 # can't take over noctua's.
