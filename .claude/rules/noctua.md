@@ -56,6 +56,8 @@ Change nothing else there — each `vendor/*/PARLIAMENT.md` lists every patched 
 
 New fields on `ConnectionDef` need `#[serde(default)]`. The on-disk format (`~/.sqlclient/connections.json`) must keep deserializing across versions. No breaking changes without migration logic.
 
+It holds passwords: write it only through `save_connections_to` — atomic, 0600, via `settings::write_atomic_0600` — and `make_private` makes one others can read 0600 when noctua starts.
+
 ## Lock-wait / concurrency
 
 A prior incident (Apr 9): concurrent sessions on the same DB hitting row locks caused the activity pane's lock-wait display to hang. Fixed by separating the monitoring query path from the session's own connection — the monitoring queries open their own transient connections, not borrow the session's.

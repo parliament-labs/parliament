@@ -46,7 +46,9 @@ noctua/    Axum HTTP + WebSocket server. Owns MySQL connections via sqlx.
            One MySqlConnection per session (Arc<Mutex<>>), never pooled —
            preserves temp tables, transactions, session state.
            Loads/saves connections from ~/.sqlclient/connections.json and
-           preferences from ~/.sqlclient/settings.json (settings.rs).
+           preferences from ~/.sqlclient/settings.json (settings.rs), both
+           written atomically, 0600 — connections.json holds passwords,
+           and one others can read is made 0600 when noctua starts.
            editor/ opens the user's editor for \e (resolve, wrapper,
            terminal, macos, direct, focus); notices.rs streams PG notices;
            frontend.rs builds Tyto's dist/ into the binary under the

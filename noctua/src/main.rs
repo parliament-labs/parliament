@@ -54,7 +54,7 @@ use sqlx::{
     postgres::PgConnectOptions,
     Connection, Executor, MySqlConnection, PgConnection,
 };
-use std::{collections::HashMap, path::PathBuf, sync::Arc, time::Instant};
+use std::{collections::HashMap, path::{Path, PathBuf}, sync::Arc, time::Instant};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use uuid::Uuid;
@@ -443,19 +443,42 @@ fn parse_connections_file(s: &str) -> ConnectionFile {
 
 async fn load_connections() -> ConnectionFile {
     let path = connections_path();
+    make_private(&path);
     match tokio::fs::read_to_string(&path).await {
         Ok(data) => parse_connections_file(&data),
         Err(_) => ConnectionFile::default(),
     }
 }
 
-async fn persist_connections(file: &ConnectionFile) {
-    let path = connections_path();
-    if let Some(parent) = path.parent() {
-        let _ = tokio::fs::create_dir_all(parent).await;
+/// The connections file holds passwords, so it's the user's alone: one
+/// others can read — saved before saves were 0600 — is made 0600 when
+/// noctua starts (a symlink's target, if it's a link).
+fn make_private(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(meta) = std::fs::metadata(path) else { return };
+        if meta.is_file() && meta.permissions().mode() & 0o077 != 0 {
+            if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+                tracing::error!("couldn't make {} private: {e}", path.display());
+            }
+        }
     }
-    if let Ok(json) = serde_json::to_string_pretty(file) {
-        let _ = tokio::fs::write(&path, json).await;
+}
+
+fn persist_connections(file: &ConnectionFile) {
+    save_connections_to(&connections_path(), file);
+}
+
+/// Write the connections file as settings.json is written: atomically,
+/// 0600 (`settings::write_atomic_0600`), a symlink replaced by a regular
+/// file. A save that fails is logged; the change stays in memory.
+fn save_connections_to(path: &Path, file: &ConnectionFile) {
+    let saved = serde_json::to_string_pretty(file)
+        .map_err(std::io::Error::other)
+        .and_then(|json| settings::write_atomic_0600(path, json.as_bytes()));
+    if let Err(e) = saved {
+        tracing::error!("couldn't save {}: {e}", path.display());
     }
 }
 
@@ -932,7 +955,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
             } else {
                 file.connections.push(full.clone());
             }
-            persist_connections(&file).await;
+            persist_connections(&file);
             // Echo back the password-free public view — the saved
             // connection's row in the sidebar refreshes without ever
             // carrying the password down the wire.
@@ -942,14 +965,14 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
         ClientMessage::DeleteConnection { id } => {
             let mut file = state.connections.lock().await;
             file.connections.retain(|c| c.id != id);
-            persist_connections(&file).await;
+            persist_connections(&file);
             vec![ServerMessage::ConnectionDeleted { id }]
         }
 
         ClientMessage::SaveFolders { folders } => {
             let mut file = state.connections.lock().await;
             file.folders = folders.clone();
-            persist_connections(&file).await;
+            persist_connections(&file);
             vec![ServerMessage::FoldersSaved { folders }]
         }
 
@@ -1678,6 +1701,47 @@ mod tests {
         let file = parse_connections_file("not json at all");
         assert!(file.connections.is_empty());
         assert!(file.folders.is_empty());
+    }
+
+    /// `path`'s permission bits.
+    #[cfg(unix)]
+    fn mode(path: &Path) -> u32 {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::metadata(path).unwrap().permissions().mode() & 0o777
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn saved_connections_are_private_even_over_a_readable_file() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        std::fs::write(&path, "[]").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let file = parse_connections_file(r#"{"version": 2, "folders": ["Prod"], "connections": []}"#);
+        save_connections_to(&path, &file);
+        assert_eq!(mode(&path), 0o600);
+        assert_eq!(parse_connections_file(&std::fs::read_to_string(&path).unwrap()).folders, vec!["Prod"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_connections_file_others_can_read_is_made_private() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        std::fs::write(&path, "[]").unwrap();
+        for loose in [0o644, 0o640, 0o604, 0o666] {
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(loose)).unwrap();
+            make_private(&path);
+            assert_eq!(mode(&path), 0o600, "from {loose:o}");
+        }
+        // The user's alone already, if stricter: left as it is.
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400)).unwrap();
+        make_private(&path);
+        assert_eq!(mode(&path), 0o400);
+        // No file yet: nothing to do.
+        make_private(&dir.path().join("missing.json"));
     }
 
     #[test]
