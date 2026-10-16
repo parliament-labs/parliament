@@ -1,5 +1,6 @@
 # Builds Parliament's single binary — noctua with Tyto's release build
-# compiled in (`embed-frontend`) — for macOS and Linux.
+# compiled in (`embed-frontend`) — for macOS on Apple Silicon and
+# Linux on x86-64 and ARM64.
 #
 # Pushing a tag `v*` creates a DRAFT release and attaches each build to
 # it; publishing the release stays a person's decision. Run by hand
@@ -44,8 +45,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Apple Silicon only: current macOS doesn't run on Intel Macs.
           - { target: aarch64-apple-darwin, os: macos-latest }
-          - { target: x86_64-apple-darwin, os: macos-latest }
           # Built on 22.04: needs glibc 2.35+ and OpenSSL 3 (libssl.so.3) —
           # current Debian, Ubuntu, Fedora, RHEL 9; not RHEL 7 / 8.
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
