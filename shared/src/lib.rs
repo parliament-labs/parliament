@@ -381,8 +381,8 @@ impl From<&ConnectionDef> for ConnectionDefPublic {
 
 /// On-disk shape of `~/.sqlclient/connections.json`. v1 was a bare array
 /// of [`ConnectionDef`]; v2 wraps that in an object so empty folders can
-/// persist alongside connections. The loader accepts both via the
-/// untagged [`ConnectionFileRaw`] enum in `noctua`.
+/// persist alongside connections. noctua's `parse_connections_file`
+/// reads both.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ConnectionFile {
     #[serde(default = "default_file_version")]
@@ -394,7 +394,11 @@ pub struct ConnectionFile {
     pub connections: Vec<ConnectionDef>,
 }
 
-fn default_file_version() -> u32 { 2 }
+/// The connections file's schema version this build writes; a file with
+/// a higher one came from a newer Parliament, and isn't saved over.
+pub const CONNECTIONS_FILE_VERSION: u32 = 2;
+
+fn default_file_version() -> u32 { CONNECTIONS_FILE_VERSION }
 
 /// An environment variable a database CLI reads to pick the editor for
 /// `\e`. A closed set: the browser says which of these its plane's CLI
@@ -671,7 +675,14 @@ pub enum ServerMessage {
         /// breaking the message shape.
         #[serde(default)]
         folders: Vec<String>,
+        /// Why `~/.sqlclient/connections.json` couldn't be used as it is —
+        /// unreadable, or a newer Parliament's — for the sidebar to say.
+        #[serde(default)]
+        notice: Option<String>,
     },
+    /// What the sidebar should say about the connections file now: sent
+    /// when a save moved an unreadable file aside, or was refused.
+    ConnectionsNotice { notice: Option<String> },
     /// Echoed after a successful `SaveConnection`. The frontend uses
     /// this to update its `connections` signal. Password omitted — see
     /// [`ConnectionDefPublic`].
@@ -967,6 +978,22 @@ mod tests {
                 assert_eq!(severity, "NOTICE");
                 assert!(message.contains("skipping"));
             }
+            other => panic!("wrong variant: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn connections_notice_round_trips_and_defaults_to_none() {
+        let msg = ServerMessage::ConnectionsNotice { notice: Some("kept as connections.json.broken-1".into()) };
+        let json = serde_json::to_string(&msg).unwrap();
+        match serde_json::from_str::<ServerMessage>(&json).unwrap() {
+            ServerMessage::ConnectionsNotice { notice } => assert_eq!(notice.as_deref(), Some("kept as connections.json.broken-1")),
+            other => panic!("wrong variant: {other:?}"),
+        }
+        // A ConnectionList without the field — an older noctua's — has none.
+        let old = r#"{"type":"ConnectionList","data":{"connections":[],"folders":[]}}"#;
+        match serde_json::from_str::<ServerMessage>(old).unwrap() {
+            ServerMessage::ConnectionList { notice, .. } => assert_eq!(notice, None),
             other => panic!("wrong variant: {other:?}"),
         }
     }

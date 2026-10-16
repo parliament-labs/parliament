@@ -56,7 +56,7 @@ Change nothing else there — each `vendor/*/PARLIAMENT.md` lists every patched 
 
 New fields on `ConnectionDef` need `#[serde(default)]`. The on-disk format (`~/.sqlclient/connections.json`) must keep deserializing across versions. No breaking changes without migration logic.
 
-It holds passwords: write it only through `save_connections_to` — atomic, 0600, via `settings::write_atomic_0600` — and `make_private` makes one others can read 0600 when noctua starts.
+It holds passwords: write it only through `save_connections_to`, which saves under `userfile.rs`'s rules (atomic, 0600; an unreadable file moved aside to `.broken-<ts>` first; a newer `version` refused), and `make_private` makes one others can read 0600 when noctua starts. `load_connections_from` says why a file couldn't be used (`ConnectionsNotice`, sent in `ConnectionList.notice` and, when a save changes it, as `ServerMessage::ConnectionsNotice`; the sidebar shows it) — in words that never quote the file (`unreadable_because`: serde's own message can echo a value).
 
 ## Lock-wait / concurrency
 
@@ -87,7 +87,7 @@ Errors: `QueryError` / `DescribeError` / `IntrospectError` / `SessionError` carr
 - Never run an editor through a shell. Direct launches get null stdin/stdout, stderr to a file, `setsid`; terminal launches run the generated `run.sh` (every word shell-quoted) and report through the atomic `done` marker (`editor/wrapper.rs`).
 - Editor tasks live in their own `JoinSet`, aborted when the socket closes; a direct editor gets SIGTERM, a terminal editor keeps its files and its script cleans up when it exits. No recursive deletes in generated shell — named files + `rmdir`.
 
-`settings.rs` keeps `~/.sqlclient/settings.json`: atomic 0600 writes, never overwrite an unreadable file (move it to `.broken-<ts>` on save), refuse to save over a newer `version`.
+`settings.rs` keeps `~/.sqlclient/settings.json` under the same `userfile.rs` rules as connections.json: atomic 0600 writes, never overwrite an unreadable file (move it to `.broken-<ts>` on save), refuse to save over a newer `version`.
 
 ## Dev command
 

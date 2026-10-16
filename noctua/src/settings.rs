@@ -2,21 +2,17 @@
 //! connections.json. Loaded once at startup into `AppState`; replaced
 //! wholesale by `SaveSettings`.
 //!
-//! The file is user data, so two rules: writes are atomic (a crash
-//! mid-write can't leave half a file), and a file that can't be read is
-//! never overwritten — defaults are used in memory, the problem is
-//! reported, and the next save moves the unreadable file aside first.
-//!
-//! The file is written 0600. A `~/.sqlclient` directory noctua creates
-//! is 0700; an existing one keeps the permissions the user gave it. A
-//! symlinked settings.json is replaced by a regular file (the rename
-//! doesn't write through links). Without `$HOME` the path is relative
+//! It's saved as connections.json is (`userfile`): atomically, 0600, an
+//! unreadable file moved aside first, a newer Parliament's file never
+//! written over. A file that can't be read loads as the defaults, the
+//! problem reported (`load_error`). Without `$HOME` the path is relative
 //! to noctua's working directory, same as connections.json.
 
-use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use shared::settings::{AppSettings, SETTINGS_VERSION};
+
+use crate::userfile;
 
 pub(crate) fn settings_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
@@ -44,7 +40,7 @@ pub(crate) fn load(path: &Path) -> LoadedSettings {
             load_error: Some(format!(
                 "{} was written by a newer Parliament (settings v{}); this build \
                  shows what it understands but won't save over it.",
-                path.display(), settings.version,
+                userfile::shown(path), settings.version,
             )),
             settings,
         },
@@ -59,73 +55,23 @@ fn unreadable(path: &Path, why: &str) -> LoadedSettings {
         load_error: Some(format!(
             "{} couldn't be read ({why}); using defaults. Saving will keep the \
              old file as a .broken backup.",
-            path.display(),
+            userfile::shown(path),
         )),
     }
 }
 
-/// Write `settings` to `path`. Refuses to overwrite a file from a newer
-/// schema version; moves an unreadable file aside to
-/// `<name>.broken-<unix-secs>` before writing.
+/// Write `settings` to `path` (`userfile::save`): refused over a newer
+/// schema version's file; an unreadable one moved aside first.
 pub(crate) fn save(path: &Path, settings: &AppSettings) -> Result<(), String> {
-    // Bytes, not a String: a file that isn't UTF-8 is just another
-    // unreadable file to move aside, not a reason to refuse saving.
-    match std::fs::read(path) {
-        Ok(existing) => match serde_json::from_slice::<AppSettings>(&existing) {
-            Ok(on_disk) if on_disk.version > SETTINGS_VERSION => {
-                return Err(format!(
-                    "{} was written by a newer Parliament (settings v{}); not \
-                     overwriting it.",
-                    path.display(), on_disk.version,
-                ));
-            }
-            Ok(_) => {}
-            Err(_) => {
-                let backup = broken_backup_path(path);
-                std::fs::rename(path, &backup).map_err(|e| format!(
-                    "Couldn't move the unreadable {} aside: {e}", path.display(),
-                ))?;
-            }
-        },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-        Err(e) => return Err(format!("Couldn't read {}: {e}", path.display())),
-    }
     let mut to_write = settings.clone();
     to_write.version = SETTINGS_VERSION;
     let json = serde_json::to_string_pretty(&to_write)
         .map_err(|e| format!("Couldn't encode settings: {e}"))?;
-    write_atomic_0600(path, json.as_bytes())
-        .map_err(|e| format!("Couldn't write {}: {e}", path.display()))
-}
-
-fn broken_backup_path(path: &Path) -> PathBuf {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0);
-    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
-    path.with_file_name(format!("{name}.broken-{secs}"))
-}
-
-/// Replace `path` with `bytes` atomically: write a temp file in the
-/// same directory (created 0600), flush it to disk, then rename over
-/// the target. A missing directory is created 0700; an existing one is
-/// left as the user set it.
-pub(crate) fn write_atomic_0600(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    let dir = path.parent().ok_or_else(|| std::io::Error::other("path has no parent directory"))?;
-    if !dir.exists() {
-        std::fs::create_dir_all(dir)?;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
-        }
-    }
-    let mut tmp = tempfile::NamedTempFile::new_in(dir)?;
-    tmp.write_all(bytes)?;
-    tmp.as_file().sync_all()?;
-    tmp.persist(path).map_err(|e| e.error)?;
-    Ok(())
+    userfile::save(path, json.as_bytes(), "settings", |bytes| match serde_json::from_slice::<AppSettings>(bytes) {
+        Ok(on_disk) if on_disk.version > SETTINGS_VERSION => userfile::OnDisk::Newer(on_disk.version),
+        Ok(_) => userfile::OnDisk::Readable,
+        Err(_) => userfile::OnDisk::Unreadable,
+    }).map(|_| ())
 }
 
 #[cfg(test)]

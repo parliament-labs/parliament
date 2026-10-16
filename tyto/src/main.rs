@@ -673,6 +673,9 @@ fn App() -> impl IntoView {
     // this signal carries the folders the user has created but not yet
     // populated, so they stick across renders.
     let connection_folders: RwSignal<Vec<String>>    = create_rw_signal(vec![]);
+    // What noctua says about ~/.sqlclient/connections.json when it
+    // couldn't use it as it is — shown above the connections.
+    let connections_notice: RwSignal<Option<String>> = create_rw_signal(None);
     let shell_panes: RwSignal<HashMap<String, ShellTab>> = create_rw_signal(HashMap::new());
     let workspace_tabs: RwSignal<Vec<WorkspaceTab>>  = create_rw_signal(vec![]);
     let active_wt_id: RwSignal<Option<String>>       = create_rw_signal(None);
@@ -921,10 +924,12 @@ fn App() -> impl IntoView {
                 ServerMessage::SettingsSaved { settings } => settings_ui.saved(ws, settings),
                 ServerMessage::SettingsError { message } => settings_ui.failed(message),
                 ServerMessage::EditorTestResult { ok, message } => settings_ui.tested(ok, message),
-                ServerMessage::ConnectionList { connections: list, folders } => {
+                ServerMessage::ConnectionList { connections: list, folders, notice } => {
                     connections.set(list);
                     connection_folders.set(folders);
+                    connections_notice.set(notice);
                 }
+                ServerMessage::ConnectionsNotice { notice } => connections_notice.set(notice),
                 ServerMessage::FoldersSaved { folders } => {
                     connection_folders.set(folders);
                 }
@@ -5057,6 +5062,8 @@ fn App() -> impl IntoView {
                                 }}
                             </span>
                         </div>
+
+                        {move || connections_notice.get().map(|n| view! { <div class="sidebar-notice">{n}</div> })}
 
                         {move || {
                             let conns = connections.get();

@@ -257,6 +257,19 @@ html, body {
     justify-content: space-between;
     padding: 6px 16px 4px;
 }
+/* What noctua says about connections.json when it couldn't use it as
+   it is — the sidebar's own text on the Settings notice's yellow. */
+.sidebar-notice {
+    font-size: 11px;
+    color: var(--sidebar-text);
+    background: rgba(210, 153, 34, 0.14);
+    border-left: 2px solid var(--yellow);
+    margin: 4px 12px 8px;
+    padding: 6px 8px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+
 .sidebar-section-label {
     font-size: 10px;
     font-weight: 600;

@@ -32,6 +32,7 @@ mod locale;
 mod notices;
 mod pgpass;
 mod settings;
+mod userfile;
 mod values;
 
 use axum::{
@@ -44,9 +45,8 @@ use axum::{
     routing::get,
     Router,
 };
-use serde::Deserialize;
 use shared::{
-    BatchResult, ClientMessage, CommandStatus, DbError, ConnectionDef, ConnectionDefPublic, ConnectionFile,
+    BatchResult, ClientMessage, CommandStatus, DbError, ConnectionDef, ConnectionDefPublic, ConnectionFile, CONNECTIONS_FILE_VERSION,
     CredentialSource, DbType, ResultSet, ServerMessage, TxnState,
 };
 use sqlx::{
@@ -398,8 +398,20 @@ type ConnStore = Arc<Mutex<ConnectionFile>>;
 struct AppState {
     sessions: Sessions,
     connections: ConnStore,
+    /// What the sidebar says about connections.json (`ConnectionList.notice`).
+    connections_notice: Arc<Mutex<ConnectionsNotice>>,
     /// App-wide preferences (`~/.sqlclient/settings.json`).
     settings: Arc<Mutex<settings::LoadedSettings>>,
+}
+
+/// Why connections.json couldn't be used as it is — until a save that
+/// works makes that moot — or, once an unreadable one was moved aside,
+/// where it went.
+#[derive(Debug, Default)]
+struct ConnectionsNotice {
+    text: Option<String>,
+    /// A save that works clears it.
+    until_saved: bool,
 }
 
 // ── Connection file storage ───────────────────────────────────────────────────
@@ -415,38 +427,87 @@ fn connections_path() -> PathBuf {
 // before the backend is exposed to more than one user. See
 // vault/Architecture/Deployment Topologies.md.
 
-/// Untagged on-disk parse target. The v2 file is a `ConnectionFile` object
-/// with `version` / `folders` / `connections`. The v1 file was a bare array
-/// of `ConnectionDef`. `untagged` lets serde try v2 first, then fall back
-/// to v1 — both shapes deserialize transparently.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum ConnectionFileRaw {
-    V2(ConnectionFile),
-    Legacy(Vec<ConnectionDef>),
-}
-
-/// Parse the on-disk file contents into a v2 [`ConnectionFile`], migrating
-/// the legacy bare-array shape transparently. Pulled out so the migration
-/// path is unit-testable without touching the filesystem.
-fn parse_connections_file(s: &str) -> ConnectionFile {
-    match serde_json::from_str::<ConnectionFileRaw>(s) {
-        Ok(ConnectionFileRaw::V2(file)) => file,
-        Ok(ConnectionFileRaw::Legacy(connections)) => ConnectionFile {
-            version: 2,
-            folders: vec![],
-            connections,
-        },
-        Err(_) => ConnectionFile::default(),
+/// Read the connections file: the v2 object (`version` / `folders` /
+/// `connections`), or the v1 bare array of `ConnectionDef`, migrated; an
+/// empty file has no connections. Each shape is read as itself, so an
+/// error says where in it.
+fn parse_connections_file(bytes: &[u8]) -> Result<ConnectionFile, serde_json::Error> {
+    let first = bytes.iter().find(|b| !b.is_ascii_whitespace());
+    if first.is_none() {
+        return Ok(ConnectionFile::default());
     }
+    if first == Some(&b'[') {
+        let connections = serde_json::from_slice::<Vec<ConnectionDef>>(bytes)?;
+        return Ok(ConnectionFile { version: CONNECTIONS_FILE_VERSION, folders: vec![], connections });
+    }
+    serde_json::from_slice::<ConnectionFile>(bytes)
 }
 
-async fn load_connections() -> ConnectionFile {
-    let path = connections_path();
-    make_private(&path);
-    match tokio::fs::read_to_string(&path).await {
-        Ok(data) => parse_connections_file(&data),
-        Err(_) => ConnectionFile::default(),
+/// The schema version a connections file says it has, read on its own:
+/// a newer Parliament's file may not parse as this build's whole shape.
+fn file_version(bytes: &[u8]) -> Option<u32> {
+    #[derive(serde::Deserialize)]
+    struct Versioned { version: u32 }
+    serde_json::from_slice::<Versioned>(bytes).ok().map(|v| v.version)
+}
+
+/// What went wrong reading the file, and where — never serde's own
+/// message, which can quote a value, and the file holds passwords.
+fn unreadable_because(e: &serde_json::Error) -> String {
+    use serde_json::error::Category;
+    let what = match e.classify() {
+        Category::Syntax => "it isn't valid JSON",
+        Category::Eof => "it ends too soon",
+        Category::Data => "a value in it isn't one Parliament reads",
+        Category::Io => "it couldn't be read",
+    };
+    format!("{what} (line {}, column {})", e.line(), e.column())
+}
+
+/// The connections file, made private first, and what the sidebar should
+/// say about it when it can't be used as it is: unreadable (empty for now,
+/// moved aside by the next save), a newer Parliament's (read, never saved
+/// over), or not readable at all (empty, never saved over).
+fn load_connections_from(path: &Path) -> (ConnectionFile, ConnectionsNotice) {
+    make_private(path);
+    let at = userfile::shown(path);
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Default::default(),
+        Err(e) => return (ConnectionFile::default(), ConnectionsNotice {
+            text: Some(format!("{at} couldn't be read ({e}). Parliament started without your saved connections, and won't save over the file.")),
+            until_saved: true,
+        }),
+    };
+    match parse_connections_file(&bytes) {
+        Ok(file) if file.version > CONNECTIONS_FILE_VERSION => {
+            let text = format!(
+                "{at} was written by a newer Parliament (connections v{}). This build shows the \
+                 connections it reads but won't save over the file: changes last until noctua stops.",
+                file.version,
+            );
+            (file, ConnectionsNotice { text: Some(text), until_saved: true })
+        }
+        Ok(file) => (file, ConnectionsNotice::default()),
+        Err(_) if file_version(&bytes).is_some_and(|v| v > CONNECTIONS_FILE_VERSION) => (ConnectionFile::default(), ConnectionsNotice {
+            text: Some(format!(
+                "{at} was written by a newer Parliament (connections v{}). This build can't read \
+                 its connections and won't save over the file: changes last until noctua stops.",
+                file_version(&bytes).unwrap_or_default(),
+            )),
+            until_saved: true,
+        }),
+        // A save makes this moot: it moves the file aside, or finds
+        // nothing to move (gone, or put right by hand).
+        Err(e) => (ConnectionFile::default(), ConnectionsNotice {
+            text: Some(format!(
+                "{at} couldn't be read: {}. Parliament started without your saved connections. \
+                 To get them back, fix the file and restart noctua; a change saved first keeps \
+                 the file beside the new one.",
+                unreadable_because(&e),
+            )),
+            until_saved: true,
+        }),
     }
 }
 
@@ -466,20 +527,48 @@ fn make_private(path: &Path) {
     }
 }
 
-fn persist_connections(file: &ConnectionFile) {
-    save_connections_to(&connections_path(), file);
+/// Save the connections file, and — when the save moved an unreadable
+/// file aside, was refused, or works again after a notice it made moot
+/// — what the sidebar should say now (to the tab that saved; another
+/// tab hears it when it next lists the connections). A refused save is
+/// logged; the change stays in memory.
+async fn persist_connections(state: &AppState, file: &ConnectionFile) -> Option<ServerMessage> {
+    let path = connections_path();
+    let mut notice = state.connections_notice.lock().await;
+    *notice = match save_connections_to(&path, file) {
+        Ok(None) if !notice.until_saved => return None,
+        Ok(None) => ConnectionsNotice::default(),
+        Ok(Some(backup)) => ConnectionsNotice {
+            text: Some(format!(
+                "{} couldn't be read, so it was kept beside it as {} and a new one started.",
+                userfile::shown(&path),
+                backup.file_name().map_or_else(|| backup.display().to_string(), |n| n.to_string_lossy().into_owned()),
+            )),
+            until_saved: false,
+        },
+        Err(e) => {
+            tracing::error!("{e}");
+            ConnectionsNotice { text: Some(format!("{e} Changes last until noctua stops.")), until_saved: true }
+        }
+    };
+    Some(ServerMessage::ConnectionsNotice { notice: notice.text.clone() })
 }
 
-/// Write the connections file as settings.json is written: atomically,
-/// 0600 (`settings::write_atomic_0600`), a symlink replaced by a regular
-/// file. A save that fails is logged; the change stays in memory.
-fn save_connections_to(path: &Path, file: &ConnectionFile) {
-    let saved = serde_json::to_string_pretty(file)
-        .map_err(std::io::Error::other)
-        .and_then(|json| settings::write_atomic_0600(path, json.as_bytes()));
-    if let Err(e) = saved {
-        tracing::error!("couldn't save {}: {e}", path.display());
-    }
+/// Write the connections file as settings.json is written
+/// (`userfile::save`): atomically, 0600; an unreadable file moved aside
+/// first (where it went is returned), a newer Parliament's refused.
+fn save_connections_to(path: &Path, file: &ConnectionFile) -> Result<Option<PathBuf>, String> {
+    let to_write = ConnectionFile { version: CONNECTIONS_FILE_VERSION, ..file.clone() };
+    let json = serde_json::to_string_pretty(&to_write)
+        .map_err(|e| format!("Couldn't encode the connections: {e}"))?;
+    userfile::save(path, json.as_bytes(), "connections", |bytes| match parse_connections_file(bytes) {
+        Ok(on_disk) if on_disk.version > CONNECTIONS_FILE_VERSION => userfile::OnDisk::Newer(on_disk.version),
+        Ok(_) => userfile::OnDisk::Readable,
+        Err(_) => match file_version(bytes) {
+            Some(version) if version > CONNECTIONS_FILE_VERSION => userfile::OnDisk::Newer(version),
+            _ => userfile::OnDisk::Unreadable,
+        },
+    })
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
@@ -488,9 +577,14 @@ fn save_connections_to(path: &Path, file: &ConnectionFile) {
 async fn main() {
     notices::init_tracing();
 
+    let (connections, connections_notice) = load_connections_from(&connections_path());
+    if let Some(text) = &connections_notice.text {
+        tracing::error!("{text}");
+    }
     let state = AppState {
         sessions: Arc::new(Mutex::new(HashMap::new())),
-        connections: Arc::new(Mutex::new(load_connections().await)),
+        connections: Arc::new(Mutex::new(connections)),
+        connections_notice: Arc::new(Mutex::new(connections_notice)),
         settings: Arc::new(Mutex::new(settings::load(&settings::settings_path()))),
     };
 
@@ -906,6 +1000,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
             vec![ServerMessage::ConnectionList {
                 connections: pubs,
                 folders: file.folders,
+                notice: state.connections_notice.lock().await.text.clone(),
             }]
         }
 
@@ -955,25 +1050,25 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
             } else {
                 file.connections.push(full.clone());
             }
-            persist_connections(&file);
+            let notice = persist_connections(state, &file).await;
             // Echo back the password-free public view — the saved
             // connection's row in the sidebar refreshes without ever
             // carrying the password down the wire.
-            vec![ServerMessage::ConnectionSaved { def: (&full).into() }]
+            [ServerMessage::ConnectionSaved { def: (&full).into() }].into_iter().chain(notice).collect()
         }
 
         ClientMessage::DeleteConnection { id } => {
             let mut file = state.connections.lock().await;
             file.connections.retain(|c| c.id != id);
-            persist_connections(&file);
-            vec![ServerMessage::ConnectionDeleted { id }]
+            let notice = persist_connections(state, &file).await;
+            [ServerMessage::ConnectionDeleted { id }].into_iter().chain(notice).collect()
         }
 
         ClientMessage::SaveFolders { folders } => {
             let mut file = state.connections.lock().await;
             file.folders = folders.clone();
-            persist_connections(&file);
-            vec![ServerMessage::FoldersSaved { folders }]
+            let notice = persist_connections(state, &file).await;
+            [ServerMessage::FoldersSaved { folders }].into_iter().chain(notice).collect()
         }
 
         // ── Connection test (ephemeral — connect + disconnect immediately) ────
@@ -1659,7 +1754,7 @@ mod tests {
             "folders": ["Production", "Production/MySQL"],
             "connections": []
         }"#;
-        let file = parse_connections_file(json);
+        let file = parse_connections_file(json.as_bytes()).unwrap();
         assert_eq!(file.version, 2);
         assert_eq!(file.folders, vec!["Production", "Production/MySQL"]);
         assert!(file.connections.is_empty());
@@ -1676,7 +1771,7 @@ mod tests {
             "folder_path": "Old/MySQL",
             "pinned": true
         }]"#;
-        let file = parse_connections_file(json);
+        let file = parse_connections_file(json.as_bytes()).unwrap();
         assert_eq!(file.version, 2);
         assert!(file.folders.is_empty());
         assert_eq!(file.connections.len(), 1);
@@ -1692,15 +1787,113 @@ mod tests {
             "host": "h", "port": 3306, "user": "u", "password": "p",
             "database": "d", "folder_path": null
         }]"#;
-        let file = parse_connections_file(json);
+        let file = parse_connections_file(json.as_bytes()).unwrap();
         assert_eq!(file.connections[0].paths, Vec::<String>::new());
     }
 
     #[test]
-    fn malformed_file_falls_back_to_empty() {
-        let file = parse_connections_file("not json at all");
+    fn malformed_file_is_an_error() {
+        assert!(parse_connections_file(b"not json at all").is_err());
+        assert!(parse_connections_file(br#"{"version": 2, "connections": [{"id": 1}]}"#).is_err());
+    }
+
+    /// A v2 file holding one connection, `extra` spliced into it.
+    fn one_connection(extra: &str) -> String {
+        format!(r#"{{"version": 2, "folders": ["Prod"], "connections": [{{
+            "id": "c1", "name": "Prod DB", "db_type": "postgres", "host": "h", "port": 5432,
+            "user": "u", "password": "pw", "database": "d"{extra}
+        }}]}}"#)
+    }
+
+    #[test]
+    fn an_unreadable_connections_file_is_kept_and_moved_aside_by_the_next_save() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        let broken = one_connection(",");   // a trailing comma: not JSON
+        std::fs::write(&path, &broken).unwrap();
+
+        let (file, notice) = load_connections_from(&path);
         assert!(file.connections.is_empty());
-        assert!(file.folders.is_empty());
+        let text = notice.text.unwrap();
+        assert!(text.contains("couldn't be read: it isn't valid JSON (line 4, column"), "{text}");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), broken, "loading leaves it alone");
+
+        // The next save keeps it as connections.json.broken-<secs>.
+        let backup = save_connections_to(&path, &file).unwrap().expect("moved aside");
+        assert!(backup.file_name().unwrap().to_string_lossy().starts_with("connections.json.broken-"));
+        assert_eq!(std::fs::read_to_string(&backup).unwrap(), broken);
+        assert!(parse_connections_file(&std::fs::read(&path).unwrap()).unwrap().connections.is_empty());
+        // And a save after that just saves.
+        assert_eq!(save_connections_to(&path, &file), Ok(None));
+    }
+
+    #[test]
+    fn what_the_notice_says_never_quotes_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        // A password typed where the port goes: serde's message would quote it.
+        std::fs::write(&path, one_connection("").replace("5432", "\"s3cr3t-pw\"")).unwrap();
+        let text = load_connections_from(&path).1.text.unwrap();
+        assert!(text.contains("a value in it isn't one Parliament reads (line 2, column"), "{text}");
+        assert!(!text.contains("s3cr3t-pw"), "{text}");
+    }
+
+    #[test]
+    fn a_newer_parliaments_connections_file_is_read_but_never_saved_over() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        let newer = one_connection(", \"tags\": [\"future\"]").replace("\"version\": 2", "\"version\": 3");
+        std::fs::write(&path, &newer).unwrap();
+
+        let (file, notice) = load_connections_from(&path);
+        assert_eq!(file.connections.len(), 1, "what this build reads still shows");
+        assert!(notice.until_saved);
+        assert!(notice.text.unwrap().contains("newer Parliament (connections v3)"));
+        let refused = save_connections_to(&path, &file).unwrap_err();
+        assert!(refused.contains("newer Parliament (connections v3); not overwriting it"), "{refused}");
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), newer);
+    }
+
+    #[test]
+    fn a_newer_file_this_build_cant_parse_is_still_never_saved_over() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        let newer = r#"{"version": 3, "connections": {"by_id": {}}}"#;
+        std::fs::write(&path, newer).unwrap();
+        let (file, notice) = load_connections_from(&path);
+        assert!(file.connections.is_empty());
+        assert!(notice.text.unwrap().contains("newer Parliament (connections v3). This build can't read its connections"));
+        assert!(save_connections_to(&path, &file).unwrap_err().contains("not overwriting it"));
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), newer);
+    }
+
+    #[test]
+    fn an_empty_connections_file_has_no_connections_and_nothing_to_say() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        std::fs::write(&path, " \n").unwrap();
+        let (file, notice) = load_connections_from(&path);
+        assert!(file.connections.is_empty());
+        assert!(notice.text.is_none());
+        assert_eq!(save_connections_to(&path, &file), Ok(None), "saved over, not moved aside");
+    }
+
+    #[test]
+    fn a_missing_connections_file_is_nothing_to_say() {
+        let dir = tempfile::tempdir().unwrap();
+        let (file, notice) = load_connections_from(&dir.path().join("connections.json"));
+        assert!(file.connections.is_empty());
+        assert!(notice.text.is_none());
+    }
+
+    #[test]
+    fn a_saved_file_carries_this_builds_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("connections.json");
+        let mut file = parse_connections_file(one_connection("").as_bytes()).unwrap();
+        file.version = 7;   // as loaded from a newer file, then moved aside by hand
+        save_connections_to(&path, &file).unwrap();
+        assert_eq!(parse_connections_file(&std::fs::read(&path).unwrap()).unwrap().version, CONNECTIONS_FILE_VERSION);
     }
 
     /// `path`'s permission bits.
@@ -1718,10 +1911,10 @@ mod tests {
         let path = dir.path().join("connections.json");
         std::fs::write(&path, "[]").unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
-        let file = parse_connections_file(r#"{"version": 2, "folders": ["Prod"], "connections": []}"#);
-        save_connections_to(&path, &file);
+        let file = parse_connections_file(br#"{"version": 2, "folders": ["Prod"], "connections": []}"#).unwrap();
+        assert_eq!(save_connections_to(&path, &file), Ok(None));
         assert_eq!(mode(&path), 0o600);
-        assert_eq!(parse_connections_file(&std::fs::read_to_string(&path).unwrap()).folders, vec!["Prod"]);
+        assert_eq!(parse_connections_file(&std::fs::read(&path).unwrap()).unwrap().folders, vec!["Prod"]);
     }
 
     #[cfg(unix)]
