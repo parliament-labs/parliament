@@ -79,7 +79,7 @@ cargo install trunk
 cargo run -p noctua          #  First Terminal — backend on localhost:3000
 trunk serve                   # Second Terminal — WASM dev server on localhost:8080
 
-# Once the backend sessions are strted, Open http://localhost:8080 in your browser, add database profiles to the sidebar, select the profile you wish to work with!  You are in!
+# Once the backend sessions are started, open http://localhost:8080 in your browser, add database profiles to the sidebar, select the profile you wish to work with!  You are in!
 ```
 
 The Backend must be restarted manually after backend code changes. Trunk hot-reloads the frontend automatically.
