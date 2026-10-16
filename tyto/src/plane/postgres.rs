@@ -2190,7 +2190,7 @@ impl DbmsPlane for PostgresPlane {
         privilege: &str,
     ) -> Option<String> {
         let (verb, prep) = ("GRANT", "TO");
-        Some(pg_grant_or_revoke(verb, prep, kind, schema, name, grantee, privilege)?)
+        pg_grant_or_revoke(verb, prep, kind, schema, name, grantee, privilege)
     }
 
     fn revoke_sql(
@@ -2202,7 +2202,7 @@ impl DbmsPlane for PostgresPlane {
         privilege: &str,
     ) -> Option<String> {
         let (verb, prep) = ("REVOKE", "FROM");
-        Some(pg_grant_or_revoke(verb, prep, kind, schema, name, grantee, privilege)?)
+        pg_grant_or_revoke(verb, prep, kind, schema, name, grantee, privilege)
     }
 
     fn schema_grant_sql(

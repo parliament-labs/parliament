@@ -267,8 +267,8 @@ pub fn find_bracket_match(text: &str, pos: usize) -> Option<(usize, usize)> {
     };
     let mut depth: i32 = 0;
     if forward {
-        for i in pos..bytes.len() {
-            let c = bytes[i] as char;
+        for (i, &b) in bytes.iter().enumerate().skip(pos) {
+            let c = b as char;
             if c == open_ch { depth += 1; }
             else if c == close_ch {
                 depth -= 1;

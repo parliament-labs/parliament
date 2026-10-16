@@ -1330,7 +1330,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
                     let mut c = conn.lock().await;
                     let result = execute_introspect(&mut c, &sql, &session_id, &tag).await;
                     let is_error = matches!(result, ServerMessage::IntrospectError { .. });
-                    finalize_session_response(&state, &mut c, &session_id, result, is_error).await
+                    finalize_session_response(state, &mut c, &session_id, result, is_error).await
                 }
             }
         }
@@ -1374,7 +1374,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
                         },
                     };
                     let is_error = matches!(result, ServerMessage::DmlError { .. });
-                    finalize_session_response(&state, &mut c, &session_id, result, is_error).await
+                    finalize_session_response(state, &mut c, &session_id, result, is_error).await
                 }
             }
         }
@@ -1436,7 +1436,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
                     let mut c = conn.lock().await;
                     let result = execute_query(&mut c, &sql, &session_id).await;
                     let is_error = matches!(result, ServerMessage::QueryError { .. });
-                    finalize_session_response(&state, &mut c, &session_id, result, is_error).await
+                    finalize_session_response(state, &mut c, &session_id, result, is_error).await
                 }
             }
         }
@@ -1466,7 +1466,7 @@ async fn process_message(msg: ClientMessage, state: &AppState) -> Vec<ServerMess
                         },
                     };
                     let is_error = matches!(result, ServerMessage::DescribeError { .. });
-                    finalize_session_response(&state, &mut c, &session_id, result, is_error).await
+                    finalize_session_response(state, &mut c, &session_id, result, is_error).await
                 }
             }
         }

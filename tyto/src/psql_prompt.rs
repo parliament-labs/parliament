@@ -194,6 +194,7 @@ mod tests {
         pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn ctx<'a>(
         user: &'a str,
         dbname: &'a str,
@@ -260,7 +261,7 @@ mod tests {
     }
 
     #[test]
-    fn state_indicator_R() {
+    fn state_indicator_r() {
         let v = vars(&[]);
         let c = ctx("u", "db", "h", "5432", "1", TxnState::Idle, false, 1, &v);
         assert_eq!(format_prompt("%R",  &c), "=");

@@ -1836,18 +1836,18 @@ fn my_quote_ident(s: &str) -> String {
 /// - `"8.0.32"`         → `Some(8)`
 /// - `"5.7.39"`         → `Some(5)`
 /// - `"5.7.39-log"`     → `Some(5)` (the trailing `-log` is the suffix
-///                        for a binary-log-enabled build; common on
-///                        managed-MySQL providers)
+///   for a binary-log-enabled build; common on
+///   managed-MySQL providers)
 /// - `"8.0.32-cluster"` → `Some(8)`
 /// - `""` / `"unknown"` → `None`
 /// - `"10.6.7-MariaDB"` → `None` (MariaDB is a different RDBMS that
-///                        speaks the MySQL wire protocol but doesn't
-///                        share `performance_schema.data_locks` OR
-///                        `information_schema.INNODB_LOCKS`. Callers
-///                        in this plane treat `None` as the "I don't
-///                        know how to talk to this server's lock
-///                        catalog" sentinel and produce an empty-
-///                        shape result rather than a hard error.)
+///   speaks the MySQL wire protocol but doesn't
+///   share `performance_schema.data_locks` OR
+///   `information_schema.INNODB_LOCKS`. Callers
+///   in this plane treat `None` as the "I don't
+///   know how to talk to this server's lock
+///   catalog" sentinel and produce an empty-
+///   shape result rather than a hard error.)
 ///
 /// For non-MariaDB cases where parsing fails, callers default to the
 /// 8.x path — falling back to a deprecated info-schema view by
@@ -1858,7 +1858,7 @@ fn mysql_server_major_version(version: &str) -> Option<u8> {
         return None;
     }
     version
-        .split(|c: char| c == '.' || c == '-')
+        .split(['.', '-'])
         .next()?
         .trim()
         .parse::<u8>()

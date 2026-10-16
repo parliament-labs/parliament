@@ -902,7 +902,7 @@ pub(crate) struct ObjectGrantRow {
     ///   - `direct`    — explicit GRANT row in the ACL.
     ///   - `inherited` — gained via membership in a directly-granted role.
     ///   - `none`      — no access at all (placeholder for the
-    ///                   "show all roles" mode).
+    ///     "show all roles" mode).
     pub(crate) source:    String,
     /// For inherited grants, the immediate granting role (the role
     /// in the membership chain that holds the actual GRANT). Empty
@@ -949,6 +949,10 @@ pub(crate) enum DataViewMode { Grid, Vertical, Insert }
 /// Failed carries the error message until the user retries the cell.
 #[derive(Clone)]
 pub(crate) enum EditStatus { Saving, Saved, Failed(String) }
+
+/// Each ERD neighbour's columns in "all fields" mode — (column name,
+/// whether it's in the primary key) — by (schema, table).
+pub(crate) type ErdNeighbourColumns = HashMap<(String, String), Vec<(String, bool)>>;
 
 /// Per-(schema, table) detail state cached on the explorer pane.
 #[derive(Clone, Copy)]
@@ -1039,7 +1043,7 @@ pub(crate) struct TableDetail {
     /// Cached column-name + is-pk lookup for the visible-neighbour set in
     /// "all fields" mode. Keyed by (schema, table). Loaded lazily when
     /// the user first turns "Keys Only" off; refetched only on DDL.
-    pub(crate) erd_neighbour_columns: RwSignal<LoadState<HashMap<(String, String), Vec<(String, bool)>>>>,
+    pub(crate) erd_neighbour_columns: RwSignal<LoadState<ErdNeighbourColumns>>,
 
     // ── Privileges tab state ──────────────────────────────────────────
     /// Per-(grantee × privilege) effective access on this object,
@@ -2404,6 +2408,18 @@ pub(crate) enum NotificationEvent {
     Err { message: String },
 }
 
+/// Tab completion's column cache: `(schema, table) → LoadState<[columns]>`.
+pub(crate) type CompletionColumns = HashMap<(String, String), LoadState<Vec<String>>>;
+
+/// Where the right-click menu on a partitioned table's partition count
+/// opened (x, y), the parent's (schema, name), and whether its partitions
+/// were expanded then — which names the menu's one verb.
+pub(crate) type PartitionMenuAnchor = (f64, f64, (String, String), bool);
+
+/// An admin area's drill-in detail rows, cached by (area, row name,
+/// section name).
+pub(crate) type AdminRowDetails = HashMap<(AdminArea, String, String), LoadState<Vec<Vec<String>>>>;
+
 /// All reactive state for one shell pane.
 #[derive(Clone)]
 pub(crate) struct ShellTab {
@@ -2546,7 +2562,7 @@ pub(crate) struct ShellTab {
     /// LoadState so a second `.` on the same table doesn't re-fire the
     /// fetch and so an in-flight fetch can be distinguished from a never-
     /// requested one. DDL invalidation clears the whole map.
-    pub(crate) completion_columns:       RwSignal<HashMap<(String, String), LoadState<Vec<String>>>>,
+    pub(crate) completion_columns:       RwSignal<CompletionColumns>,
     pub(crate) explorer_object_ddls:     RwSignal<HashMap<(ObjectKind, String, String), LoadState<String>>>,
     /// True when the user has switched the typebar from object kinds
     /// (Tables/Views/...) to Admin. Hides the schema picker and replaces
@@ -2584,7 +2600,7 @@ pub(crate) struct ShellTab {
     /// ("Collapse partitions" when expanded, "Expand partitions" when
     /// collapsed) without re-deriving the threshold logic. Explicit per-
     /// project rule that right-click never silently fires an action.
-    pub(crate) explorer_partition_menu: RwSignal<Option<(f64, f64, (String, String), bool)>>,
+    pub(crate) explorer_partition_menu: RwSignal<Option<PartitionMenuAnchor>>,
     /// Admin Roles list. Loaded lazily the first time the user enters
     /// the Roles admin area in this pane; cached for the session.
     pub(crate) explorer_admin_roles:    RwSignal<LoadState<Vec<AdminRow>>>,
@@ -2669,7 +2685,7 @@ pub(crate) struct ShellTab {
     /// Per-(area, row-name, section-name) cached detail rows. Populated
     /// lazily when the user opens a drill-in inspector and the section
     /// hasn't been fetched yet for this row. Cleared on row change.
-    pub(crate) explorer_admin_row_detail: RwSignal<HashMap<(AdminArea, String, String), LoadState<Vec<Vec<String>>>>>,
+    pub(crate) explorer_admin_row_detail: RwSignal<AdminRowDetails>,
     pub(crate) activity_sessions:     RwSignal<LoadState<Vec<SessionRow>>>,
     pub(crate) activity_locks:        RwSignal<LoadState<Vec<LockRow>>>,
     pub(crate) activity_blocks:       RwSignal<LoadState<Vec<BlockEdge>>>,

@@ -84,14 +84,10 @@ fn resolve_specs(
         }
     };
     if v == h {
-        return Err(format!(
-            "\\crosstabview: vertical and horizontal columns must differ",
-        ));
+        return Err("\\crosstabview: vertical and horizontal columns must differ".to_string());
     }
     if v == d || h == d {
-        return Err(format!(
-            "\\crosstabview: data column must differ from both row and column label columns",
-        ));
+        return Err("\\crosstabview: data column must differ from both row and column label columns".to_string());
     }
     let s = sortcol_h.map(|s| resolve_col(s, columns)).transpose()?;
     Ok((v, h, d, s))

@@ -541,7 +541,7 @@ fn extract_projection_resolved(
             ProjectionItem::Named(s) => out.push(s),
             ProjectionItem::Star => {
                 // Union of every local alias's resolved columns.
-                for (_, resolution) in &local_aliases {
+                for resolution in local_aliases.values() {
                     append_resolved_columns(resolution, columns, pending, &mut out);
                 }
             }
@@ -714,6 +714,7 @@ fn tokenize(input: &str) -> Vec<Tok<'_>> {
     out
 }
 
+#[allow(clippy::too_many_arguments)]
 fn parse_from_clause(
     toks:           &[Tok<'_>],
     start:          usize,

@@ -1517,6 +1517,7 @@ pub(crate) fn render_admin_subtoolbar(
 /// Name is always the first column. Click a row to drill into its detail.
 /// Search filters case-insensitively across name + extras so DBAs can
 /// grep "localhost" or "super" without thinking about which column.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_admin_roles_list(
     plane:          &'static dyn DbmsPlane,
     state:          LoadState<Vec<AdminRow>>,
@@ -1695,7 +1696,7 @@ pub(crate) fn render_admin_area_row_detail(
     plane:        &'static dyn DbmsPlane,
     area:         AdminArea,
     row_id:       String,
-    detail_data:  RwSignal<HashMap<(AdminArea, String, String), LoadState<Vec<Vec<String>>>>>,
+    detail_data:  RwSignal<AdminRowDetails>,
     // Click-edit signals + WS handles; passed-through unconditionally
     // but only the "Privileges" section dispatch uses them. None of
     // the existing Tablespaces sections care.
@@ -1847,6 +1848,7 @@ pub(crate) fn render_admin_area_row_detail(
 /// Source column tagging each row. A banner above the table flags
 /// superuser status, since superusers bypass checks regardless of what
 /// the table shows.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_admin_role_detail(
     plane:        &'static dyn DbmsPlane,
     row:          AdminRow,
@@ -2331,7 +2333,7 @@ struct PartitionParentInfo {
     child_count:    usize,
     parent_key:     (String, String),
     expanded_state: RwSignal<std::collections::HashSet<(String, String)>>,
-    menu_state:     RwSignal<Option<(f64, f64, (String, String), bool)>>,
+    menu_state:     RwSignal<Option<PartitionMenuAnchor>>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2349,7 +2351,7 @@ pub(crate) fn render_object_list(
     ws:          RwSignal<Option<WebSocket>>,
     session:  ExplorerSession,
     expanded_parents: RwSignal<std::collections::HashSet<(String, String)>>,
-    partition_menu:   RwSignal<Option<(f64, f64, (String, String), bool)>>,
+    partition_menu:   RwSignal<Option<PartitionMenuAnchor>>,
     sort_by_kind:     RwSignal<HashMap<ObjectKind, (String, bool)>>,
 ) -> leptos::View {
     match listing {
@@ -2556,7 +2558,7 @@ pub(crate) fn render_object_list(
 /// captured at right-click time, and clicking it fires the same set-
 /// membership flip.
 fn render_partition_context_menu(
-    partition_menu:   RwSignal<Option<(f64, f64, (String, String), bool)>>,
+    partition_menu:   RwSignal<Option<PartitionMenuAnchor>>,
     expanded_parents: RwSignal<std::collections::HashSet<(String, String)>>,
 ) -> leptos::View {
     view! {
@@ -2719,7 +2721,6 @@ fn render_outer_row(
     }.into_view()
 }
 
-#[allow(clippy::too_many_arguments)]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn render_inline_detail(
     kind:           ObjectKind,
@@ -4143,6 +4144,10 @@ fn erd_target_card(
     card
 }
 
+/// A band's "+N more" pill: its band, x, y and width, how many cards it
+/// stands for, and those cards (as `ErdOverflow::hidden` lists them).
+type ErdPill = (ErdGen, i32, i32, i32, usize, Vec<(String, String, usize)>);
+
 /// Overflow tail captured by a band builder when the per-band cap clips
 /// it. Drives the "+N more" pill that renders at the bottom of the
 /// affected band, plus the popover that lists the hidden tables.
@@ -4310,7 +4315,7 @@ enum ErdSide { Left, Right }
 
 /// Resolve overlaps: sort by y, push the lower one down whenever the previous
 /// card's bottom plus min-gap exceeds the current y. Idempotent.
-fn erd_resolve_overlaps(cards: &mut Vec<(ErdCard, i32 /*x*/, i32 /*y*/)>) {
+fn erd_resolve_overlaps(cards: &mut [(ErdCard, i32 /*x*/, i32 /*y*/)]) {
     cards.sort_by_key(|(_, _, y)| *y);
     for i in 1..cards.len() {
         let prev_bottom = cards[i - 1].2 + cards[i - 1].0.height();
@@ -5202,7 +5207,7 @@ pub(crate) fn render_erd_tab(
                 // as distinct objects.
                 const ERD_OVERFLOW_PILL_H: i32 = 26;
                 let pill_for_band = |overflow: &Option<ErdOverflow>, band_cards: &[(ErdCard, i32, i32)]|
-                    -> Option<(ErdGen, i32, i32, i32, usize, Vec<(String, String, usize)>)>
+                    -> Option<ErdPill>
                 {
                     let ovf = overflow.as_ref()?;
                     let (last_card, x, y) = band_cards.last()?;
@@ -5211,7 +5216,7 @@ pub(crate) fn render_erd_tab(
                     let pill_w = last_card.width();
                     Some((ovf.band, pill_x, pill_y, pill_w, ovf.hidden.len(), ovf.hidden.clone()))
                 };
-                let pills: Vec<(ErdGen, i32, i32, i32, usize, Vec<(String, String, usize)>)> = [
+                let pills: Vec<ErdPill> = [
                     pill_for_band(&gp_overflow,     &placed_gp),
                     pill_for_band(&parent_overflow, &placed_parents),
                     pill_for_band(&child_overflow,  &placed_children),
@@ -5446,7 +5451,7 @@ pub(crate) fn render_erd_tab(
 /// each card, compute the desired y as the average of: inner_card.y +
 /// inner_fk_offset - this_pk_offset across all edges to the inner layer.
 fn erd_place_outward_layer(
-    layer: &mut Vec<(ErdCard, i32, i32)>,
+    layer: &mut [(ErdCard, i32, i32)],
     inner: &[(ErdCard, i32, i32)],
     edges: &[(String, String, String, String, String, String)],
 ) {
@@ -5473,7 +5478,7 @@ fn erd_place_outward_layer(
 /// Place children: distribute their FK rows evenly across target's right-
 /// edge inner range, then resolve overlaps with min vertical gap.
 fn erd_place_children(
-    layer: &mut Vec<(ErdCard, i32, i32)>,
+    layer: &mut [(ErdCard, i32, i32)],
     target_placed: &[(ErdCard, i32, i32)],
     edges: &[(String, String, String, String, String, String)],
 ) {
@@ -5505,7 +5510,7 @@ fn erd_place_children(
 /// Place grandchildren: average ideal y across each parent (gen +1) of this
 /// grandchild, then resolve overlaps.
 fn erd_place_grandchildren(
-    layer: &mut Vec<(ErdCard, i32, i32)>,
+    layer: &mut [(ErdCard, i32, i32)],
     children_placed: &[(ErdCard, i32, i32)],
     edges: &[(String, String, String, String, String, String)],
 ) {
@@ -6453,6 +6458,7 @@ enum LoadStateMarker { NotLoaded, Loading, Loaded, Error }
 ///     only.
 ///   * Role-name filter — case-insensitive substring match on the
 ///     grantee column.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn render_privileges_tab(
     detail:        TableDetail,
     kind:          ObjectKind,
@@ -6576,6 +6582,9 @@ pub(crate) fn render_privileges_tab(
     }.into_view()
 }
 
+/// Grants or revokes one privilege: (grantee, privilege).
+type PrivilegeAction = std::rc::Rc<dyn Fn(&str, &str)>;
+
 /// Pivot the plane's flat `Vec<ObjectGrantRow>` into a (Grantee ×
 /// Privilege) matrix, sectioned by role category. Sections render
 /// in priority order so the user reads top-to-bottom for "who has
@@ -6603,8 +6612,8 @@ pub(crate) struct PrivilegeEdit {
     /// Human-readable label for the confirmation banner — e.g.
     /// `"public.film"` or `"schema public"`.
     pub object_label:   String,
-    pub grant_fire:     std::rc::Rc<dyn Fn(&str, &str)>,
-    pub revoke_fire:    std::rc::Rc<dyn Fn(&str, &str)>,
+    pub grant_fire:     PrivilegeAction,
+    pub revoke_fire:    PrivilegeAction,
 }
 
 fn render_privileges_matrix(
@@ -6765,7 +6774,7 @@ fn render_privileges_matrix(
     struct CellCtx {
         cell_status:    leptos::RwSignal<std::collections::HashMap<(String, String), EditStatus>>,
         pending_revoke: leptos::RwSignal<Option<(String, String)>>,
-        grant_fire:     std::rc::Rc<dyn Fn(&str, &str)>,
+        grant_fire:     PrivilegeAction,
     }
     let edit_ctx: Option<CellCtx> = edit.map(|e| CellCtx {
         cell_status:    e.cell_status,
@@ -7180,7 +7189,7 @@ pub(crate) fn render_data_tab(
                     // unknown (we'd need a COUNT(*) round-trip), so just
                     // hide the "of ~N" suffix.
                     let total_pages = if row_est == 0 { 1 }
-                                      else { ((row_est as usize + size - 1) / size).max(1) };
+                                      else { (row_est as usize).div_ceil(size).max(1) };
                     let page_label = if has_filter {
                         format!("Page {}", idx + 1)
                     } else if row_est > 0 {

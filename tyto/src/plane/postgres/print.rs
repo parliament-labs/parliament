@@ -2231,9 +2231,9 @@ mod tests {
         assert_eq!(with(semi(), hash(), Expanded::Off, false), "n;t;z#1;a;b;#2;c;d#(2 rows)");
         assert_eq!(with(semi(), hash(), Expanded::On, false), "n;1#t;a;b#z;##n;2#t;c#z;d");
         // Zero bytes, and a zero byte to end.
-        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::Off, false), "n\0t\0z\01\0a;b\0\02\0c\0d\0(2 rows)\0");
-        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::Off, true), "1\0a;b\0\02\0c\0d\0");
-        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::On, false), "n\01\0t\0a;b\0z\0\0\0n\02\0t\0c\0z\0d\0");
+        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::Off, false), "n\0t\0z\x001\0a;b\0\x002\0c\0d\0(2 rows)\0");
+        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::Off, true), "1\0a;b\0\x002\0c\0d\0");
+        assert_eq!(with(Separator::Zero, Separator::Zero, Expanded::On, false), "n\x001\0t\0a;b\0z\0\0\0n\x002\0t\0c\0z\0d\0");
         let titled = PrintTable { title: Some("T".into()), ..t.clone() };
         let o = PrintOptions {
             format: OutputFormat::Unaligned, expanded: Expanded::On,

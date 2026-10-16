@@ -397,10 +397,10 @@ pub(crate) fn render_sessions_table(
 
     let mut rows = rows;
     match sort {
-        ActivitySort::User    => rows.sort_by(|a, b| a.user.to_lowercase().cmp(&b.user.to_lowercase())),
-        ActivitySort::Client  => rows.sort_by(|a, b| a.client.to_lowercase().cmp(&b.client.to_lowercase())),
-        ActivitySort::Oldest  => rows.sort_by(|a, b| b.time.parse::<i64>().unwrap_or(0).cmp(&a.time.parse::<i64>().unwrap_or(0))),
-        ActivitySort::Newest  => rows.sort_by(|a, b| a.time.parse::<i64>().unwrap_or(0).cmp(&b.time.parse::<i64>().unwrap_or(0))),
+        ActivitySort::User    => rows.sort_by_key(|a| a.user.to_lowercase()),
+        ActivitySort::Client  => rows.sort_by_key(|a| a.client.to_lowercase()),
+        ActivitySort::Oldest  => rows.sort_by_key(|a| std::cmp::Reverse(a.time.parse::<i64>().unwrap_or(0))),
+        ActivitySort::Newest  => rows.sort_by_key(|a| a.time.parse::<i64>().unwrap_or(0)),
     };
 
     if rows.is_empty() {

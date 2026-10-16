@@ -128,7 +128,7 @@ pub(crate) fn classify_idx_scan_pct(pct: f64) -> Severity {
 ///
 /// - ≤5% green: autovacuum is comfortably keeping pace with churn
 /// - 5-20% yellow: routine — autovacuum triggers around 20% by default
-/// - >20% red: autovacuum should be running but hasn't, or is being
+/// - \>20% red: autovacuum should be running but hasn't, or is being
 ///   blocked by a long-running transaction holding back the xmin
 ///   horizon
 ///
@@ -166,7 +166,7 @@ pub(crate) fn build_dead_tup_tooltip(pct: f64, live: i64, dead: i64) -> String {
 ///
 /// - <50% green: healthy headroom, autovacuum won't trigger on freeze
 /// - 50-100% yellow: autovacuum should be handling this soon or now
-/// - >100% red: anti-wraparound vacuum should already be running; if
+/// - \>100% red: anti-wraparound vacuum should already be running; if
 ///   it isn't, something's blocking it (typically a long-running txn
 ///   holding back the xmin horizon)
 ///

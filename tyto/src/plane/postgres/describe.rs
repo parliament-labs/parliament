@@ -1254,6 +1254,8 @@ mod tests {
     /// nothing outlives the test.
     #[test]
     #[ignore]
+    // Its query callback's error is a whole DbError, as live::staged_output takes it.
+    #[allow(clippy::result_large_err)]
     fn describe_matches_psql_on_every_footer() {
         let mut psql = live::Session::open("pagila");
         psql.step("BEGIN;\nCREATE SCHEMA parliament_fixture;\nSET LOCAL search_path = parliament_fixture;");

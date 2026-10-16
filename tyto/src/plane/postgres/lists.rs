@@ -2793,10 +2793,6 @@ mod tests {
         (theirs.to_string(), ours.to_string())
     }
 
-    /// `\du` / `\du+` over roles with every attribute line psql writes —
-    /// connection limits of 0, 1 and more, a password expiry, no
-    /// inheritance, a comment.
-
     /// psql's `ECHO_HIDDEN`: what a list command sends is the query psql
     /// sends — `psql -E` prints it between its lines — word for word, and
     /// the query psql sends after it for its footers (`\dn <pattern>`'s
@@ -2827,6 +2823,9 @@ mod tests {
         assert!(failures.is_empty(), "{} of {} differ:\n{}", failures.len(), LIST_COMMANDS.len(), failures.join("\n"));
     }
 
+    /// `\du` / `\du+` over roles with every attribute line psql writes —
+    /// connection limits of 0, 1 and more, a password expiry, no
+    /// inheritance, a comment.
     #[test]
     #[ignore]
     fn role_attributes_match_psql() {
@@ -2982,6 +2981,8 @@ mod tests {
     /// one session holding the fixture.
     #[test]
     #[ignore]
+    // Its query callback's error is a whole DbError, as live::staged_output takes it.
+    #[allow(clippy::result_large_err)]
     fn publications_subscriptions_and_large_objects_match_psql() {
         let setup = [
             "CREATE TABLE parl_probe_pt (id int, note text, secret text)",

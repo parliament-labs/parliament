@@ -192,6 +192,8 @@ fn build_connection_tree(conns: &[ConnectionDefPublic], explicit_folders: &[Stri
 /// placements. Empty `source_path` means the row is in the synthetic
 /// "All Connections" view (the connection's actual placement is
 /// elsewhere — or root, if `conn.paths` is empty).
+// A few dozen rows, rebuilt per render: boxing the connection buys nothing.
+#[allow(clippy::large_enum_variant)]
 enum SidebarRow {
     Folder { name: String, path: String, depth: usize, is_root: bool },
     Connection {
@@ -2185,7 +2187,7 @@ fn App() -> impl IntoView {
                             .collect();
                         let rows: Vec<ObjectRow> = rows.into_iter()
                             .map(|r| {
-                                let schema = r.get(0).cloned().unwrap_or_default();
+                                let schema = r.first().cloned().unwrap_or_default();
                                 let name   = r.get(1).cloned().unwrap_or_default();
                                 let parent_schema = parent_schema_idx
                                     .and_then(|i| r.get(i))
@@ -3406,7 +3408,7 @@ fn App() -> impl IntoView {
                             .and_then(|w| w.document())
                             .and_then(|d| d.get_element_by_id(&id))
                         {
-                            if let Some(ta) = el.clone().dyn_into::<web_sys::HtmlInputElement>().ok() {
+                            if let Ok(ta) = el.clone().dyn_into::<web_sys::HtmlInputElement>() {
                                 let _ = ta.focus();
                                 ta.select();
                             }
@@ -5332,7 +5334,7 @@ fn App() -> impl IntoView {
                             });
                             if !collapsed_snapshot.contains("") {
                                 let mut all = conns.clone();
-                                all.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+                                all.sort_by_key(|a| a.name.to_lowercase());
                                 for conn in all {
                                     // Rows under the synthetic "All Connections" view
                                     // carry empty source_path — drag from here ADDS a
@@ -5600,7 +5602,7 @@ fn App() -> impl IntoView {
                                         {move || {
                                             let hide = nc_db_type.get() == DbType::Postgres
                                                 && nc_credential_source.get() == CredentialSource::Pgpass;
-                                            if hide { return view! { <></> }.into_view(); }
+                                            if hide { return ().into_view(); }
                                             view! {
                                                 <div class="form-row">
                                                     <label class="form-label">"Password"</label>
@@ -5624,7 +5626,7 @@ fn App() -> impl IntoView {
                                     // connect time.
                                     {move || {
                                         if nc_db_type.get() != DbType::Postgres {
-                                            return view! { <></> }.into_view();
+                                            return ().into_view();
                                         }
                                         view! {
                                             <div class="form-row">
@@ -5761,7 +5763,7 @@ fn App() -> impl IntoView {
                                     // empty database produces a clean error from noctua.
                                     {move || {
                                         if nc_db_type.get() != DbType::Postgres {
-                                            return view! { <></> }.into_view();
+                                            return ().into_view();
                                         }
                                         let schemas = nc_schema_list.get();
                                         if schemas.is_empty() {
@@ -6088,7 +6090,7 @@ fn App() -> impl IntoView {
                                     dialog_input.set(String::new());
                                     on_submit.call(v);
                                 };
-                                let submit_for_btn = submit.clone();
+                                let submit_for_btn = submit;
                                 view! {
                                     <div class="app-dialog-title">{title}</div>
                                     <div class="app-dialog-message">{message}</div>
@@ -6146,7 +6148,7 @@ fn App() -> impl IntoView {
                                 .and_then(|w| w.document())
                                 .and_then(|d| d.get_element_by_id("app-dialog-input"))
                             {
-                                if let Some(inp) = el.dyn_into::<web_sys::HtmlInputElement>().ok() {
+                                if let Ok(inp) = el.dyn_into::<web_sys::HtmlInputElement>() {
                                     let _ = inp.focus();
                                     inp.select();
                                 }
@@ -6945,7 +6947,7 @@ where
                         let show = !banner_reopens
                             && banner_stale.map(|s| s.get()).unwrap_or(false)
                             && banner_sid.map(|s| s.get().is_none()).unwrap_or(false);
-                        if !show { return view! { <></> }.into_view(); }
+                        if !show { return ().into_view(); }
                         let conn = banner_conn.clone().unwrap_or_default();
                         let pidc = pid_for_btn.clone();
                         let role_c = banner_role.clone();
