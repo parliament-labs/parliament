@@ -8,6 +8,21 @@ The project is named after the collective noun for a group of owls. Its componen
 
 Parliament is a three-tier SQL client that brings the power of a native terminal shell to the browser — without Electron, without a desktop app, without compromises. The backend holds database connections; the frontend is pure WASM. DBAs get the commands they know (`\dt`, `\sf`, `\watch`, `\safe-mode`) with browser-native conveniences (save-as download, resizable splits, persistent history, inline confirmation gates).
 
+## Install
+
+One binary, nothing else to install. On a Mac (Apple Silicon):
+
+```bash
+curl -fsSL https://github.com/parliament-labs/parliament/releases/latest/download/parliament-aarch64-apple-darwin.tar.gz | tar -xz
+./parliament-aarch64-apple-darwin/noctua
+```
+
+On Linux, use `parliament-x86_64-unknown-linux-gnu` or `parliament-aarch64-unknown-linux-gnu` instead (glibc 2.35+ and OpenSSL 3). Then open http://localhost:3000 and add a connection with the **+** in the sidebar. Every release is on the [releases page](https://github.com/parliament-labs/parliament/releases).
+
+- Parliament runs on your own machine, for you alone: noctua listens on 127.0.0.1:3000 only.
+- Saved connections, passwords included, are kept in `~/.sqlclient/connections.json`, readable by you alone. Postgres connections can take their password from `~/.pgpass` instead.
+- The binaries aren't signed. macOS blocks one downloaded through a browser; `xattr -dr com.apple.quarantine parliament-aarch64-apple-darwin` lets it run. A `curl` download isn't affected.
+
 ## Features
 
 ### SQL Shell
@@ -68,7 +83,7 @@ Parliament is a three-tier SQL client that brings the power of a native terminal
 - **Multiple pane types** — Shell, Schema Explorer, and Activity in the same workspace
 - **Per-connection workspaces** — sidebar switches between connections; each connection owns its layout
 
-## Quick Start
+## Build from source
 
 ```bash
 # Prerequisites (once)
@@ -83,6 +98,12 @@ trunk serve                   # Second Terminal — WASM dev server on localhost
 ```
 
 The Backend must be restarted manually after backend code changes. Trunk hot-reloads the frontend automatically.
+
+The single binary the releases ship is noctua with the frontend built in:
+
+```bash
+trunk build --release && cargo build --release -p noctua --features embed-frontend
+```
 
 ## Architecture
 
