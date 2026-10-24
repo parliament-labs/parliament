@@ -55,6 +55,7 @@ npx playwright show-report                 # open HTML report
 - Tests use `helpers/app.ts` to load the app and wait for a WS-ready DOM signal, then `helpers/connect.ts` to click the relevant sidebar entry.
 - Screenshot specs capture specific UI states and write PNGs to `../../docs/screenshots/`. That directory is committed.
 - The README's demo GIF: `screenshots/05-readme-demo.spec.ts` captures its frames (and how long each shows) to `screenshots/_demo/`, ignored; `python3 scripts/readme-demo-gif.py` (needs Pillow) builds `docs/screenshots/readme-demo.gif` from them. It's 1x, so the README embeds it without a width, at the column's full width. Run it on connections that open a shell and show nothing private.
+- The brand images: `screenshots/06-brand-images.spec.ts` renders `tyto/favicon.png` from `tyto/favicon.svg` (Noto Emoji's owl, Apache-2.0 — see NOTICE) and draws `docs/screenshots/social-preview.png`, the 1280×640 card GitHub shows for a shared link, around a real shell screenshot. Upload a new card by hand: Settings → General → Social preview.
 
 ## Conventions
 

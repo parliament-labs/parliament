@@ -50,3 +50,13 @@ vendor/sqlx-postgres and vendor/sqlx-mysql are SQLx 0.8.6
 LLC, licensed under MIT OR Apache-2.0 (the LICENSE-MIT and LICENSE-APACHE
 files in each directory). Parliament has modified them; each directory's
 PARLIAMENT.md lists the changes.
+
+------------------------------------------------------------------------
+Noto Emoji: the owl
+------------------------------------------------------------------------
+
+tyto/favicon.svg is Noto Emoji's owl, 2D/svg/emoji_u1f989.svg from
+https://github.com/googlefonts/noto-emoji (commit 941158915716),
+Copyright 2013 Google, Inc., licensed under the Apache License, Version
+2.0 (LICENSE). tyto/favicon.png and the owl in
+docs/screenshots/social-preview.png are rendered from it.
