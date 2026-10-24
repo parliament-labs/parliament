@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { openApp } from '../helpers/app';
 import { clickConnection } from '../helpers/connect';
-import { visibleShellInput } from '../helpers/panes';
+import { ensureShellPane, visibleShellInput } from '../helpers/panes';
 
 // Regression suite covering PRs #31, #34, #35 — three shell improvements
 // that are invisible to cargo check / clippy / unit tests.
@@ -31,11 +31,13 @@ import { visibleShellInput } from '../helpers/panes';
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 
 // ── Shared setup helper ───────────────────────────────────────────────────────
-// Opens the app, connects to Local Postgres, and waits for the shell input.
-// Returns the visible shell input locator.
+// Opens the app, connects to Local Postgres, has a shell on it (whatever
+// the connection opens with), and waits for the shell input. Returns the
+// visible shell input locator.
 async function setupShell(page: Parameters<typeof openApp>[0]) {
   await openApp(page);
   await clickConnection(page, 'Local Postgres');
+  await ensureShellPane(page);
   const input = visibleShellInput(page);
   await expect(input).toBeVisible({ timeout: 15_000 });
   return input;

@@ -2323,8 +2323,9 @@ mod tests {
 
     /// A noctua MySQL session has the settings a mysql CLI session has —
     /// time zone, sql_mode, character sets, collation — so the same SQL
-    /// means the same thing in both (`||` included). Needs the mysql CLI
-    /// on PATH and the local sakila database:
+    /// means the same thing in both (`||` included). Both over TCP, so the
+    /// CLI doesn't need the server's socket file. Needs the mysql CLI on
+    /// PATH and the local sakila database:
     /// `cargo test -p noctua -- --ignored mysql_session_matches_the_cli`
     #[tokio::test]
     #[ignore]
@@ -2332,7 +2333,7 @@ mod tests {
         const SESSION: &str = "SELECT @@session.time_zone, @@session.sql_mode, @@character_set_client, \
                                @@character_set_connection, @@character_set_results, @@collation_connection, 1 || 0";
         let cli = std::process::Command::new("mysql")
-            .args(["-u", "root", "sakila", "--batch", "--skip-column-names", "-e", SESSION])
+            .args(["-h", "127.0.0.1", "-u", "root", "sakila", "--batch", "--skip-column-names", "-e", SESSION])
             .output().expect("mysql on PATH");
         assert!(cli.status.success(), "{}", String::from_utf8_lossy(&cli.stderr));
         let cli: Vec<String> = String::from_utf8_lossy(&cli.stdout).trim_end().split('\t').map(String::from).collect();

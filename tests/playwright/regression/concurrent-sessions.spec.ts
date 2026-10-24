@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { openApp } from '../helpers/app';
 import { clickConnection } from '../helpers/connect';
 import { lockActorRow } from '../helpers/db';
+import { ensureShellPane, visibleShellInput } from '../helpers/panes';
 
 // Regression for the hidden deadlock fixed in commit 9501d4f. An
 // external MySQL connection row-locks actor_id=1 inside a transaction.
@@ -19,10 +20,9 @@ test('UI UPDATE blocked by external lock shows pending, then completes on releas
     await openApp(page);
     await clickConnection(page, 'Local MySQL');
 
-    // Open a shell pane so we can issue SQL. (Default-pane is schema
-    // for this user's fixture; add a shell via the toolbar.)
-    await page.locator('.tab-action-icon[title="New shell"]').click();
-    const shellInput = page.locator('.shell-input-inline').last();
+    // A shell to issue SQL in, whatever the connection opens with.
+    await ensureShellPane(page);
+    const shellInput = visibleShellInput(page);
     await expect(shellInput).toBeVisible();
 
     await shellInput.fill("UPDATE actor SET first_name = 'PENDING' WHERE actor_id = 1;");

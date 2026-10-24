@@ -3,22 +3,20 @@ import { openApp } from '../helpers/app';
 import { clickConnection } from '../helpers/connect';
 import { openSchemaExplorer, waitForObjectList } from '../helpers/schema';
 
-// Regression suite for the Storage factor metric in the Schema
-// Explorer's table-detail Overview pane.
+// Regression suite for the Storage factor metric: the table detail's
+// Storage tab (its Geometry table) and the Indexes section.
 //
 // What these tests pin:
-//   1. On PG: drilling into a Pagila table renders a "Storage" cell
-//      with a value matching the multiplier format ("N.N×") AND a
-//      tooltip explaining the breakdown.
-//   2. On PG: a "Last vacuum" sibling cell renders alongside Storage
-//      when the table has been vacuumed (Pagila's autovacuum runs
-//      occasionally).
-//   3. The Storage cell carries one of the three severity classes
-//      (`metric-good` / `metric-watch` / `metric-bad`) so the CSS
-//      coloring can never silently drop.
-//   4. On MySQL: drilling into a Sakila table renders a "Storage" cell
-//      with the same multiplier format. No "Last vacuum" — MySQL
-//      InnoDB has no autovacuum metadata.
+//   1. On PG and MySQL: a rental table's Storage tab has a "Storage
+//      factor" row whose value is a multiplier ("N.N×") and a "Pages /
+//      Ideal" row with the actual / ideal pair ("~N / ~M").
+//   2. On PG the Storage factor carries one of the three severity classes
+//      (`metric-good` / `metric-watch` / `metric-bad`), so the colouring
+//      can never silently drop, and a tooltip explaining the breakdown.
+//   3. On MySQL the header has no "Last vacuum" cell — InnoDB has no
+//      autovacuum metadata.
+//   4. The per-index Storage, Size / Ideal and Uses columns on PG, and
+//      their absence on MySQL.
 
 // Navigate to a named table in the schema-explorer object list.
 async function drillIntoTable(page: Page, tableDisplayName: string): Promise<void> {
@@ -36,62 +34,46 @@ async function drillIntoTable(page: Page, tableDisplayName: string): Promise<voi
 
 // ── Postgres / Pagila ───────────────────────────────────────────────
 
-test('PG: Pagila rental table shows a Storage factor cell with multiplier format', async ({ page }) => {
+// The Storage tab's Geometry row labelled exactly `key`, the tab opened
+// first — in the table under the Geometry header, not the Autovacuum ones.
+async function geometryRow(page: Page, key: string) {
+  await page.locator('.detail-tab-btn:visible', { hasText: /^Storage$/ }).click();
+  const geometry = page.locator('.schema-section-header', { hasText: /^Geometry$/ })
+    .locator('xpath=following-sibling::table[1]');
+  const escaped = key.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+  const row = geometry.locator('tr', { has: page.locator('td.av-key', { hasText: new RegExp(`^${escaped}$`) }) });
+  await expect(row).toBeVisible({ timeout: 10_000 });
+  return row;
+}
+
+async function openRental(page: Page, connection: string) {
   await openApp(page);
-  await clickConnection(page, 'Local Postgres');
+  await clickConnection(page, connection);
   await openSchemaExplorer(page);
   await waitForObjectList(page);
   await drillIntoTable(page, 'rental');
+}
 
-  const grid = page.locator('.object-meta-grid').first();
-  const cell = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: 'Storage' }),
-  });
-  await expect(cell).toBeVisible({ timeout: 5_000 });
-
+test('PG: Pagila rental table\'s Storage tab shows the Storage factor as a multiplier', async ({ page }) => {
+  await openRental(page, 'Local Postgres');
   // Value matches "N.N×" — one decimal place + multiplication sign.
-  const val = cell.locator('.object-meta-val');
-  await expect(val).toHaveText(/\d+\.\d×/);
+  await expect((await geometryRow(page, 'Storage factor')).locator('td.av-num')).toHaveText(/^\d+\.\d×$/);
 });
 
-test('PG: Storage cell carries a severity CSS class', async ({ page }) => {
-  await openApp(page);
-  await clickConnection(page, 'Local Postgres');
-  await openSchemaExplorer(page);
-  await waitForObjectList(page);
-  await drillIntoTable(page, 'rental');
-
-  // The .object-meta-val inside the Storage cell must carry exactly
-  // one of metric-good / metric-watch / metric-bad. Without this,
-  // the CSS coloring silently drops — the value would still render
-  // but lose its at-a-glance signal.
-  const grid = page.locator('.object-meta-grid').first();
-  const val = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: 'Storage' }),
-  }).locator('.object-meta-val');
-
-  await expect(val).toHaveAttribute(
-    'class',
-    /\bmetric-(good|watch|bad)\b/,
-  );
+test('PG: the Storage factor carries a severity CSS class', async ({ page }) => {
+  await openRental(page, 'Local Postgres');
+  // The value cell must carry exactly one of metric-good / metric-watch /
+  // metric-bad. Without it the colouring silently drops — the value would
+  // still render but lose its at-a-glance signal.
+  const val = (await geometryRow(page, 'Storage factor')).locator('td.av-num');
+  await expect(val).toHaveAttribute('class', /\bmetric-(good|watch|bad)\b/);
 });
 
-test('PG: Storage cell has a tooltip explaining the factor', async ({ page }) => {
-  await openApp(page);
-  await clickConnection(page, 'Local Postgres');
-  await openSchemaExplorer(page);
-  await waitForObjectList(page);
-  await drillIntoTable(page, 'rental');
-
-  // The tooltip is set as the `title=` attribute. Native HTML
-  // tooltips don't show up as DOM elements until hover, but the
-  // attribute itself is verifiable.
-  const grid = page.locator('.object-meta-grid').first();
-  const val = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: 'Storage' }),
-  }).locator('.object-meta-val');
-
-  const title = await val.getAttribute('title');
+test('PG: the Storage factor has a tooltip explaining the factor', async ({ page }) => {
+  await openRental(page, 'Local Postgres');
+  // The tooltip is the row's `title=` attribute: native tooltips aren't
+  // DOM elements until hover, but the attribute is verifiable.
+  const title = await (await geometryRow(page, 'Storage factor')).getAttribute('title');
   expect(title).toBeTruthy();
   expect(title!).toContain('Storage factor');
   expect(title!).toContain('actual');
@@ -99,64 +81,26 @@ test('PG: Storage cell has a tooltip explaining the factor', async ({ page }) =>
   expect(title!).toMatch(/VACUUM FULL|OPTIMIZE TABLE/);
 });
 
-// ── MySQL / Sakila ──────────────────────────────────────────────────
-
-test('MySQL: Sakila rental table shows a Storage factor cell with multiplier format', async ({ page }) => {
-  await openApp(page);
-  await clickConnection(page, 'Local MySQL');
-  await openSchemaExplorer(page);
-  await waitForObjectList(page);
-  await drillIntoTable(page, 'rental');
-
-  const grid = page.locator('.object-meta-grid').first();
-  const cell = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: 'Storage' }),
-  });
-  await expect(cell).toBeVisible({ timeout: 5_000 });
-
-  const val = cell.locator('.object-meta-val');
-  await expect(val).toHaveText(/\d+\.\d×/);
+test('MySQL: Sakila rental table\'s Storage tab shows the Storage factor as a multiplier', async ({ page }) => {
+  await openRental(page, 'Local MySQL');
+  await expect((await geometryRow(page, 'Storage factor')).locator('td.av-num')).toHaveText(/^\d+\.\d×$/);
 });
 
 // ── Pages / Ideal pairing ───────────────────────────────────────────
 
-test('PG: Pages cell shows actual / ideal pair when stats are available', async ({ page }) => {
-  await openApp(page);
-  await clickConnection(page, 'Local Postgres');
-  await openSchemaExplorer(page);
-  await waitForObjectList(page);
-  await drillIntoTable(page, 'rental');
-
-  // Pagila tables have had ANALYZE run, so we expect the paired
-  // label "Pages / Ideal" and a value matching "~N / ~M".
-  const grid = page.locator('.object-meta-grid').first();
-  const cell = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: /^Pages \/ Ideal$/ }),
-  });
-  await expect(cell).toBeVisible({ timeout: 5_000 });
-
-  const val = cell.locator('.object-meta-val');
-  await expect(val).toHaveText(/^~\d[\d,]* \/ ~\d[\d,]*$/);
+test('PG: Pages / Ideal shows the actual / ideal pair when stats are available', async ({ page }) => {
+  await openRental(page, 'Local Postgres');
+  // Pagila tables have had ANALYZE run, so the paired label and a value
+  // matching "~N / ~M".
+  await expect((await geometryRow(page, 'Pages / Ideal')).locator('td.av-num')).toHaveText(/^~\d[\d,]* \/ ~\d[\d,]*$/);
 });
 
-test('MySQL: Pages cell shows actual / ideal pair for InnoDB tables', async ({ page }) => {
-  await openApp(page);
-  await clickConnection(page, 'Local MySQL');
-  await openSchemaExplorer(page);
-  await waitForObjectList(page);
-  await drillIntoTable(page, 'rental');
-
-  const grid = page.locator('.object-meta-grid').first();
-  const cell = grid.locator('.object-meta-cell', {
-    has: page.locator('.object-meta-key', { hasText: /^Pages \/ Ideal$/ }),
-  });
-  await expect(cell).toBeVisible({ timeout: 5_000 });
-
-  const val = cell.locator('.object-meta-val');
-  await expect(val).toHaveText(/^~\d[\d,]* \/ ~\d[\d,]*$/);
+test('MySQL: Pages / Ideal shows the actual / ideal pair for InnoDB tables', async ({ page }) => {
+  await openRental(page, 'Local MySQL');
+  await expect((await geometryRow(page, 'Pages / Ideal')).locator('td.av-num')).toHaveText(/^~\d[\d,]* \/ ~\d[\d,]*$/);
 });
 
-test('MySQL: Storage cell does NOT have a sibling Last vacuum cell', async ({ page }) => {
+test('MySQL: the header has no Last vacuum cell', async ({ page }) => {
   await openApp(page);
   await clickConnection(page, 'Local MySQL');
   await openSchemaExplorer(page);
@@ -164,8 +108,10 @@ test('MySQL: Storage cell does NOT have a sibling Last vacuum cell', async ({ pa
   await drillIntoTable(page, 'rental');
 
   // MySQL has no autovacuum metadata, so the Last vacuum cell must
-  // be absent (the plane emits empty and the push-skip drops the row).
+  // be absent (the plane emits empty and the push-skip drops the row) —
+  // once the header's cells are in, so its absence means something.
   const grid = page.locator('.object-meta-grid').first();
+  await expect(grid.locator('.object-meta-key', { hasText: /^Engine$/ })).toBeVisible({ timeout: 10_000 });
   const lvCell = grid.locator('.object-meta-cell', {
     has: page.locator('.object-meta-key', { hasText: 'Last vacuum' }),
   });

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { openApp } from '../helpers/app';
-import { visibleShellInput } from '../helpers/panes';
+import { ensureShellPane, visibleShellInput } from '../helpers/panes';
 
 // Regression suite for PR #37 — per-connection shell buffer eviction threshold.
 //
@@ -240,7 +240,7 @@ test('eviction fires once threshold is exceeded, dropping the oldest block', asy
   await setBufferThreshold(page, '1');
   await saveAndClose(page);
 
-  // Open the connection (default pane is shell per the pw-pagila fixture).
+  // Open the connection, and a shell on it (whatever it opens with).
   const connItem = page
     .locator('.conn-item', {
       has: page.locator('.conn-name', { hasText: 'Local Postgres' }),
@@ -249,6 +249,7 @@ test('eviction fires once threshold is exceeded, dropping the oldest block', asy
   await connItem.click();
   const connHeader = page.locator('.conn-header-name', { hasText: 'Local Postgres' }).first();
   await expect(connHeader).toBeVisible({ timeout: 15_000 });
+  await ensureShellPane(page);
 
   const input = visibleShellInput(page);
   await expect(input).toBeVisible({ timeout: 15_000 });
@@ -330,6 +331,7 @@ test('guard prevents evicting the only block even when it exceeds the threshold'
   await connItem.click();
   const connHeader = page.locator('.conn-header-name', { hasText: 'Local Postgres' }).first();
   await expect(connHeader).toBeVisible({ timeout: 15_000 });
+  await ensureShellPane(page);
 
   const input = visibleShellInput(page);
   await expect(input).toBeVisible({ timeout: 15_000 });

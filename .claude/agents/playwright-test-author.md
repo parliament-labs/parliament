@@ -35,6 +35,7 @@ Assert on UI-only failure classes that `cargo check`, `clippy`, unit tests, and 
 | `connectToPagila(page)` | Shortcut for "Local Postgres". |
 | `connectToSakila(page)` | Shortcut for "Local MySQL". |
 | `addShellPane(page)` | Click "New shell" in active pane's tab bar. Creates fresh backend session. |
+| `ensureShellPane(page)` | After `clickConnection`: one visible shell, whatever the connection's "Opens with" is — its own shell pane, or a new one beside the Schema Explorer / Activity it opened. Use it rather than assuming a connection opens a shell (the user's own connections open the explorer). |
 | `splitActivePane(page, 'horizontal'\|'vertical')` | Split the active pane. |
 | `activatePaneByIndex(page, i)` | Click the i-th `.pane-tab`. Indexing beats text filtering because tab labels collide. |
 | `visibleShellInput(page)` / `visibleShellOutput(page)` | Scoped locator for the active pane's shell — only one `.shell-input-inline` is `display:flex` at a time. |

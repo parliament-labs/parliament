@@ -12,6 +12,21 @@ export async function addShellPane(page: Page): Promise<void> {
   await page.waitForTimeout(100);
 }
 
+// A visible shell on the connection just opened: the pane it opened, when
+// that's a shell, or a new one beside it — a connection's "Opens with" can
+// be the Schema Explorer or Activity instead. One shell either way, for a
+// connection that has just opened its one pane (call it right after
+// `clickConnection`, before opening others).
+export async function ensureShellPane(page: Page): Promise<void> {
+  // Wait for what tells the pane's kind apart — a shell's input, the
+  // explorer's or Activity's root — not the `.shell` root every pane has,
+  // which can show before its content does ("(pane not found)").
+  const shellInput = visibleShellInput(page);
+  const otherPane = page.locator('.explorer-shell:visible');
+  await expect(shellInput.or(otherPane).first()).toBeVisible({ timeout: 15_000 });
+  if (await shellInput.count() === 0) await addShellPane(page);
+}
+
 // Click the i-th `.pane-tab` in the active leaf's tab bar to activate
 // that pane. Tab labels collide when multiple panes share one
 // connection (e.g. all say "pagila"), so indexing beats text filtering.
