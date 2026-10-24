@@ -803,6 +803,9 @@ pub(crate) struct VmSummary {
     pub(crate) all_frozen_pages:  Option<u64>,
     /// Leaf partitions summed, when the relation is a partitioned parent.
     pub(crate) partitions:        Option<u64>,
+    /// Read from `pg_class` because the role was refused
+    /// `pg_visibility_map_summary()`, not because the extension is missing.
+    pub(crate) live_denied:       bool,
 }
 
 /// Where a resolved autovacuum setting value came from. The plane's
@@ -2439,6 +2442,12 @@ pub(crate) struct ShellTab {
     /// until they reconnect — acceptable trade-off given how rarely
     /// extensions are added mid-session.
     pub(crate) session_extensions: RwSignal<Vec<String>>,
+    /// The role this session connects as was refused
+    /// `pg_visibility_map_summary()` (SQLSTATE 42501), though the
+    /// extension is installed: the explorer's Visibility map reads
+    /// `pg_class` instead for the rest of the session, and says why.
+    /// Reset when a session opens — its privileges may differ.
+    pub(crate) vm_live_denied: RwSignal<bool>,
     /// What the client knows of the session, from `SessionOpened`:
     /// whether the server asked for a password, and noctua's TLS library
     /// (psql's `\conninfo`).
@@ -2923,6 +2932,7 @@ impl ShellTab {
             session_id:       create_rw_signal(None),
             session_version:  create_rw_signal(String::new()),
             session_extensions: create_rw_signal(Vec::new()),
+            vm_live_denied: create_rw_signal(false),
             session_password_used: create_rw_signal(false),
             session_ssl_library: create_rw_signal(String::new()),
             session_numeric_locale: create_rw_signal(shared::NumericLocale::default()),
@@ -3062,6 +3072,7 @@ impl ShellTab {
             session_id:       create_rw_signal(None),
             session_version:  create_rw_signal(String::new()),
             session_extensions: create_rw_signal(Vec::new()),
+            vm_live_denied: create_rw_signal(false),
             session_password_used: create_rw_signal(false),
             session_ssl_library: create_rw_signal(String::new()),
             session_numeric_locale: create_rw_signal(shared::NumericLocale::default()),
@@ -3201,6 +3212,7 @@ impl ShellTab {
             session_id:       create_rw_signal(None),
             session_version:  create_rw_signal(String::new()),
             session_extensions: create_rw_signal(Vec::new()),
+            vm_live_denied: create_rw_signal(false),
             session_password_used: create_rw_signal(false),
             session_ssl_library: create_rw_signal(String::new()),
             session_numeric_locale: create_rw_signal(shared::NumericLocale::default()),

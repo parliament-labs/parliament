@@ -285,6 +285,7 @@ pub(crate) fn parse_vm_rows(columns: &[String], rows: Vec<Vec<String>>) -> Optio
         all_visible_pages: parse_pages(get(row, col_idx("All_visible_pages"))),
         all_frozen_pages:  parse_pages(get(row, col_idx("All_frozen_pages"))),
         partitions,
+        live_denied: false,
     })
 }
 
@@ -368,12 +369,58 @@ pub(crate) fn parse_partition_rows(columns: &[String], rows: Vec<Vec<String>>) -
 pub(crate) struct ExplorerSession {
     pub(crate) id:         RwSignal<Option<String>>,
     pub(crate) extensions: RwSignal<Vec<String>>,
+    /// `pg_visibility_map_summary()` refused to this session's role.
+    pub(crate) vm_live_denied: RwSignal<bool>,
 }
 
 impl ExplorerSession {
     pub(crate) fn of(tab: &ShellTab) -> Self {
-        ExplorerSession { id: tab.session_id, extensions: tab.session_extensions }
+        ExplorerSession { id: tab.session_id, extensions: tab.session_extensions, vm_live_denied: tab.vm_live_denied }
     }
+
+    /// The extensions the explorer's SQL may use: those installed, but
+    /// `pg_visibility` only until its function is refused to the role.
+    fn usable_extensions(self) -> Vec<String> {
+        let denied = self.vm_live_denied.get_untracked();
+        self.extensions.get_untracked().into_iter().filter(|e| !(denied && e == "pg_visibility")).collect()
+    }
+}
+
+/// A table's visibility-map read and its tag: `vmlive:schema.table` when
+/// it's offered `pg_visibility` (so a refusal is known to be that
+/// function's, however many reads are in flight), `vm:schema.table` when
+/// it reads `pg_class`.
+fn vm_query(plane: &'static dyn DbmsPlane, schema: &str, name: &str, session: ExplorerSession) -> (String, String) {
+    let extensions = session.usable_extensions();
+    let live = extensions.iter().any(|e| e == "pg_visibility");
+    (plane.table_vm_sql(schema, name, &extensions), format!("{}:{schema}.{name}", if live { "vmlive" } else { "vm" }))
+}
+
+/// Whether a failed visibility-map read should be made again from
+/// `pg_class`: it was offered `pg_visibility` (`live`, its `vmlive:` tag)
+/// and the server refused its function to the role
+/// (`insufficient_privilege`, 42501). Privileges are checked when a query
+/// starts, for every function in it, so no single query can try one path
+/// and take the other: the explorer reads again. A `pg_class` read's
+/// failure is shown, so this can't loop.
+pub(crate) fn vm_read_refused(error: Option<&shared::DbError>, live: bool) -> bool {
+    live && error.and_then(|e| e.sqlstate.as_deref()) == Some("42501")
+}
+
+/// Read a table's visibility map again (`schema.table`), with the
+/// session's usable extensions — after `pg_visibility` was refused.
+/// False when it can't be sent (no session), for the caller to show the
+/// error instead.
+pub(crate) fn refire_vm(
+    plane:   &'static dyn DbmsPlane,
+    schema_dot_table: &str,
+    ws:      RwSignal<Option<WebSocket>>,
+    session: ExplorerSession,
+) -> bool {
+    let (Some(sid), Some((schema, name))) = (session.id.get_untracked(), schema_dot_table.split_once('.')) else { return false };
+    let (sql, tag) = vm_query(plane, schema, name, session);
+    ws_introspect(ws, &sid, sql, tag);
+    true
 }
 
 /// Fire the ten introspect queries behind a table's detail view. Shared
@@ -386,9 +433,8 @@ fn fire_table_introspects(
     session: ExplorerSession,
 ) {
     let Some(sid) = session.id.get_untracked() else { return };
-    let exts = session.extensions.get_untracked();
     let q = format!("{}.{}", schema, name);
-    let queries: [(String, &str); 10] = [
+    let queries: [(String, &str); 9] = [
         (plane.table_status_sql(schema, name),                   "status"),
         (plane.table_columns_sql(schema, name),                  "columns"),
         (plane.table_indexes_sql(schema, name),                  "indexes"),
@@ -397,12 +443,13 @@ fn fire_table_introspects(
         (plane.table_relationship_descendants_sql(schema, name), "reldescendants"),
         (plane.table_partitions_sql(schema, name),               "partitions"),
         (plane.table_toast_sql(schema, name),                    "toast"),
-        (plane.table_vm_sql(schema, name, &exts),                "vm"),
         (plane.table_autovac_sql(schema, name),                  "autovac"),
     ];
     for (sql, tag) in queries {
         ws_introspect(ws, &sid, sql, format!("{tag}:{q}"));
     }
+    let (sql, tag) = vm_query(plane, schema, name, session);
+    ws_introspect(ws, &sid, sql, tag);
 }
 
 pub(crate) fn ensure_table_detail_loaded(
@@ -5798,6 +5845,11 @@ fn render_vm_section(vm: VmSummary) -> leptos::View {
     let (badge_text, badge_class, badge_title) = if live {
         ("via pg_visibility", "storage-vm-source-fresh",
          "Live per-page read of the visibility map (pg_visibility extension).")
+    } else if vm.live_denied {
+        ("via pg_class", "storage-vm-source-fallback",
+         "Snapshot from the last VACUUM / ANALYZE (pg_class). pg_visibility \
+          is installed, but this role isn't allowed to run \
+          pg_visibility_map_summary().")
     } else {
         ("via pg_class", "storage-vm-source-fallback",
          "Snapshot from the last VACUUM / ANALYZE (pg_class). \
@@ -5849,6 +5901,11 @@ fn render_vm_section(vm: VmSummary) -> leptos::View {
     );
     prose.push_str(if live {
         " Read live from the visibility map."
+    } else if vm.live_denied {
+        " Snapshot from the last VACUUM or ANALYZE, so writes since then \
+         aren't reflected. pg_visibility is installed, but this role isn't \
+         allowed to run pg_visibility_map_summary(), which reads it live \
+         (a superuser, or a role granted EXECUTE on it, can)."
     } else {
         " Snapshot from the last VACUUM or ANALYZE, so writes since then \
          aren't reflected; the pg_visibility extension reads it live."
@@ -8203,6 +8260,20 @@ fn render_data_insert(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_refused_pg_visibility_read_is_read_again_from_pg_class() {
+        let refused = shared::DbError { sqlstate: Some("42501".into()), ..shared::DbError::from_message("permission denied for function pg_visibility_map_summary") };
+        let other = shared::DbError { sqlstate: Some("42P01".into()), ..shared::DbError::from_message("relation does not exist") };
+        // Every read offered pg_visibility that's refused — the second of
+        // two in flight too — is read again.
+        assert!(vm_read_refused(Some(&refused), true));
+        // A pg_class read's failure is shown, whatever it is: no loop.
+        assert!(!vm_read_refused(Some(&refused), false));
+        // Another error, or none: the server's error stands.
+        assert!(!vm_read_refused(Some(&other), true));
+        assert!(!vm_read_refused(None, true));
+    }
 
     /// A connected action shell plus the pane map the status reads.
     fn setup() -> (ShellTab, RwSignal<HashMap<String, ShellTab>>) {

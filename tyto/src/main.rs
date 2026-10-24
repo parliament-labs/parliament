@@ -1007,6 +1007,7 @@ fn App() -> impl IntoView {
                         // through `ExplorerSession` to pick
                         // extension-dependent plane SQL.
                         tab.session_extensions.set(exts);
+                        tab.vm_live_denied.set(false);
                         tab.session_password_used.set(password_used);
                         tab.session_ssl_library.set(ssl_library);
                         tab.session_numeric_locale.set(numeric_locale);
@@ -2732,9 +2733,12 @@ fn App() -> impl IntoView {
                         if let Some(detail) = find_table_detail(&ep, rest) {
                             detail.toast.set(LoadState::Loaded(parse_toast_rows(&columns, rows)));
                         }
-                    } else if let Some(rest) = tag.strip_prefix("vm:") {
+                    } else if let Some(rest) = tag.strip_prefix("vm:").or_else(|| tag.strip_prefix("vmlive:")) {
                         if let Some(detail) = find_table_detail(&ep, rest) {
-                            detail.vm.set(LoadState::Loaded(parse_vm_rows(&columns, rows)));
+                            let denied = ep.vm_live_denied.get_untracked();
+                            let vm = parse_vm_rows(&columns, rows)
+                                .map(|vm| VmSummary { live_denied: denied && vm.source == "pg_class", ..vm });
+                            detail.vm.set(LoadState::Loaded(vm));
                         }
                     } else if let Some(rest) = tag.strip_prefix("autovac:") {
                         if let Some(detail) = find_table_detail(&ep, rest) {
@@ -2906,9 +2910,20 @@ fn App() -> impl IntoView {
                         if let Some(detail) = find_table_detail(&ep, rest) {
                             detail.toast.set(LoadState::Error(message));
                         }
-                    } else if let Some(rest) = tag.strip_prefix("vm:") {
+                    } else if let Some((rest, live)) = tag.strip_prefix("vm:").map(|r| (r, false))
+                        .or_else(|| tag.strip_prefix("vmlive:").map(|r| (r, true)))
+                    {
                         if let Some(detail) = find_table_detail(&ep, rest) {
-                            detail.vm.set(LoadState::Error(message));
+                            // A read offered pg_visibility whose function the
+                            // role was refused: this table, and the session's
+                            // reads from now on, go to pg_class.
+                            let read_again = explorer::vm_read_refused(error.as_ref(), live) && {
+                                ep.vm_live_denied.set(true);
+                                explorer::refire_vm(plane_for(ep.db_type), rest, ws, explorer::ExplorerSession::of(&ep))
+                            };
+                            if !read_again {
+                                detail.vm.set(LoadState::Error(message));
+                            }
                         }
                     } else if let Some(rest) = tag.strip_prefix("autovac:") {
                         if let Some(detail) = find_table_detail(&ep, rest) {
