@@ -218,6 +218,10 @@ The Activity monitor is in a basic form and will receive further enhancements.
 - **No unsafe code**
 - **DRY** — shared helpers for common patterns (meta-command reset, DOM access, timer setup)
 
+## Contributing
+
+Bug reports, parity gaps and pull requests are welcome — [CONTRIBUTING.md](CONTRIBUTING.md) says how to set up and what a change needs. Questions and ideas go to [Discussions](https://github.com/parliament-labs/parliament/discussions); security problems, privately, as [SECURITY.md](SECURITY.md) describes.
+
 ## License
 
 Apache-2.0 — see [LICENSE](LICENSE). Parts of the Postgres shell are ports of PostgreSQL's psql and libpq, used under the PostgreSQL License, and `vendor/` holds patched SQLx crates (MIT OR Apache-2.0): see [NOTICE](NOTICE).
