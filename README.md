@@ -4,6 +4,8 @@
 
 Parliament is a browser-based SQL client built entirely in Rust with great assistance from Claude Code. It compiles to WebAssembly, runs in any modern browser, and feels native to DBAs who live in `psql` and `mysql`.
 
+<p align="center"><img src="docs/screenshots/readme-demo.gif" alt="Parliament's shell printing psql's \d actor, a query, psql's expanded display and the mysql CLI's \G, then the Schema Explorer's ERD for Pagila's rental table"></p>
+
 The project is named after the collective noun for a group of owls. Its components are **Tyto** (the barn-owl frontend, genus *Tyto*) and **Noctua** (the little-owl backend, genus *Noctua* — Athena's owl). See [`vault/Parliament/NAMING.md`](vault/Parliament/NAMING.md) for the naming rationale.
 
 ## What is this?
