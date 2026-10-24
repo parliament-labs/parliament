@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { spawnSync } from 'child_process';
 import { openApp } from '../helpers/app';
 import { clickConnection } from '../helpers/connect';
@@ -9,7 +9,7 @@ import { addShellPane, visibleShellInput, visibleShellOutput } from '../helpers/
 // alone, `\G` alone, the second `;` of `select 1;;` — in order with the
 // rest of the line. psql sends it: the server answers with nothing.
 
-async function openShell(page, connection: string) {
+async function openShell(page: Page, connection: string) {
   await openApp(page);
   await clickConnection(page, connection);
   await addShellPane(page);

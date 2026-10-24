@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { openApp } from '../helpers/app';
 import { clickConnection } from '../helpers/connect';
 import { addShellPane, visibleShellInput, visibleShellOutput } from '../helpers/panes';
@@ -12,7 +12,7 @@ import { addShellPane, visibleShellInput, visibleShellOutput } from '../helpers/
 
 const IGNORED = 'query ignored; use \\endif or Ctrl-C to exit current \\if block';
 
-async function openShell(page) {
+async function openShell(page: Page) {
   await openApp(page);
   await clickConnection(page, 'Local Postgres');
   await addShellPane(page);
